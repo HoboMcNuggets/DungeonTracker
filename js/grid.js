@@ -72,7 +72,7 @@ function normalizeBreakableWalls(cell) {
   const breakable = { ...EMPTY_BREAKABLE_WALLS };
 
   for (const side of DOOR_SIDES) {
-    breakable[side] = Boolean(raw[side]) && Boolean(preset);
+    breakable[side] = Boolean(raw[side]) && Boolean(preset?.doors[side]);
   }
 
   return breakable;
@@ -326,7 +326,7 @@ function syncLinkedBreakableWall(sourceX, sourceY, side, breakable, updatedCoord
 
   const oppositeSide = OPPOSITE_DOOR_SIDE[side];
   const neighborPreset = getPresetById(neighborCell.presetId);
-  if (!neighborPreset) return;
+  if (!neighborPreset?.doors[oppositeSide]) return;
   if (neighborCell.entranceSide === oppositeSide) return;
 
   neighborCell.breakableWalls[oppositeSide] = breakable;
@@ -344,7 +344,7 @@ function toggleBreakableWall(x, y, side) {
   }
 
   const preset = getPresetById(cell.presetId);
-  if (!preset) {
+  if (!preset?.doors[side]) {
     return { breakable: false, coords: [] };
   }
   if (cell.entranceSide === side) {
@@ -465,6 +465,7 @@ function setCell(x, y, presetId) {
   }
   if (entranceSide) {
     lockedDoors[entranceSide] = false;
+    breakableWalls[entranceSide] = false;
   }
 
   gridState.cells[y][x] = {

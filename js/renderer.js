@@ -31,7 +31,7 @@ function formatCellLabel(x, y, preset, cellData) {
         label += ` — porte${plural ? 's' : ''} verrouillée${plural ? 's' : ''} ${locked.join(', ')}`;
       }
       const breakable = EDGES.filter(
-        (side) => cellData.breakableWalls[side]
+        (side) => preset.doors[side] && cellData.breakableWalls[side]
       ).map((side) => DOOR_SIDE_ARROWS[side]);
       if (breakable.length) {
         const plural = breakable.length > 1;
@@ -103,9 +103,9 @@ function buildRoomElement(preset, cellData = null) {
       hasDoor && cellData?.lockedDoors?.[side] && !isEntranceDoor
     );
     const isBreakable = Boolean(
-      cellData?.breakableWalls?.[side] && !isEntranceDoor
+      hasDoor && cellData?.breakableWalls?.[side] && !isEntranceDoor
     );
-    const showAsDoor = hasDoor || isBreakable;
+    const showAsDoor = hasDoor;
     edge.classList.add('room__edge', `room__edge--${side}`);
     edge.classList.add(showAsDoor ? 'room__edge--door' : 'room__edge--wall');
     if (isEntranceDoor) {

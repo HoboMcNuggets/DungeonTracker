@@ -1,33 +1,34 @@
 :root {
-  --color-wall: #1a1830;
-  --color-wall-dark: #0e0c1a;
-  --color-floor: #c49a3c;
-  --color-floor-light: #d4aa4c;
-  --color-door: #fffef5;
-  --color-door-shadow: #8a7a50;
-  --color-empty: #2a2a3a;
-  --color-empty-pattern: #353548;
+  /* Défaut : palette 16-bit (SNES) — voir html[data-theme='classic'] pour le classique */
+  --color-wall: #484060;
+  --color-wall-dark: #282038;
+  --color-floor: #9c8c5c;
+  --color-floor-light: #b8a878;
+  --color-door: #e8e0c8;
+  --color-door-shadow: #584838;
+  --color-empty: #101020;
+  --color-empty-pattern: #181830;
   --color-bg: #1a1a28;
   --color-surface: #252538;
   --color-text: #e8e4d8;
   --color-text-muted: #a8a4a0;
   --color-accent: #6ab04c;
   --color-accent-hover: #7ec45e;
-  --color-entrance: #4a9fd4;
-  --color-entrance-glow: #7ec8f0;
+  --color-entrance: #58b848;
+  --color-entrance-glow: #88e878;
   --color-marker-key: #e8c84c;
   --color-marker-chest: #f2ebe0;
   --chest-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='12' width='16' height='8' rx='1' fill='%236b4423' stroke='%23e8c84c' stroke-width='1.3'/%3E%3Cpath fill='%236b4423' stroke='%23e8c84c' stroke-width='1.3' stroke-linejoin='round' d='M4 12h16v-2c0-3.3-3.6-6-8-6S4 6.7 4 10v2z'/%3E%3Crect x='4' y='11.1' width='16' height='1.8' fill='%23d4aa4c'/%3E%3Crect x='10' y='9.2' width='4' height='5.2' rx='0.6' fill='%234a3018' stroke='%23e8c84c' stroke-width='1'/%3E%3Ccircle cx='12' cy='10.3' r='0.9' fill='%23e8c84c'/%3E%3C/svg%3E");
   --color-marker-boss: #0e0c1a;
   --boss-skull-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23f0e8e8' d='M12 2C7.03 2 3 5.58 3 10c0 2.74 1.48 5.14 3.69 6.45L6 20h3v-2h6v2h3l-.69-3.55C19.52 15.14 21 12.74 21 10c0-4.42-4.03-8-9-8zm-4 8.5a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm-6.5 3.5h5v1h-5v-1z'/%3E%3C/svg%3E");
-  --color-marker-stair: #8a5a30;
+  --color-marker-stair: #684830;
   --color-staircase-link: #9ddcff;
   --color-staircase-link-shadow: #0e0c1a;
-  --color-door-locked: #8b4545;
-  --color-door-locked-shadow: #5c2a2a;
-  --color-wall-breakable: #c87830;
-  --color-wall-breakable-shadow: #8a4a18;
-  --color-wall-breakable-glow: #e8a050;
+  --color-door-locked: #a04048;
+  --color-door-locked-shadow: #601820;
+  --color-wall-breakable: #c87840;
+  --color-wall-breakable-shadow: #884818;
+  --color-wall-breakable-glow: #e8a858;
   --color-border: #4a4a68;
   --cell-size-max: 56px;
   --cell-size: var(--cell-size-max);
@@ -38,6 +39,134 @@
   --wall-thickness: 8px;
   --door-width: 42%;
   --palette-icon-size: 48px;
+}
+
+html[data-theme='classic'] {
+  --color-wall: #1a1830;
+  --color-wall-dark: #0e0c1a;
+  --color-floor: #c49a3c;
+  --color-floor-light: #d4aa4c;
+  --color-door: #fffef5;
+  --color-door-shadow: #8a7a50;
+  --color-empty: #2a2a3a;
+  --color-empty-pattern: #353548;
+  --color-entrance: #4a9fd4;
+  --color-entrance-glow: #7ec8f0;
+  --color-marker-stair: #8a5a30;
+  --color-door-locked: #8b4545;
+  --color-door-locked-shadow: #5c2a2a;
+  --color-wall-breakable: #c87830;
+  --color-wall-breakable-shadow: #8a4a18;
+  --color-wall-breakable-glow: #e8a050;
+}
+
+html[data-theme='classic'] .room--filled {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 10px,
+      rgba(0, 0, 0, 0.08) 10px,
+      rgba(0, 0, 0, 0.08) 11px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 10px,
+      rgba(0, 0, 0, 0.08) 10px,
+      rgba(0, 0, 0, 0.08) 11px
+    );
+}
+
+html[data-theme='classic'] .room__marker--staircase-linked:hover,
+html[data-theme='classic'] .room__marker--staircase-linked:focus-visible {
+  outline-color: #c4a882;
+}
+
+/* Palette des salles : NES Zelda (8-bit) */
+html[data-theme='nes'] {
+  --color-wall: #9c9c9c;
+  --color-wall-dark: #5c5c5c;
+  --color-floor: #bcbcbc;
+  --color-floor-light: #d4d4d4;
+  --color-door: #fcfcfc;
+  --color-door-shadow: #6c6c6c;
+  --color-empty: #1a1a1a;
+  --color-empty-pattern: #2a2a2a;
+  --color-entrance: #7c9cfc;
+  --color-entrance-glow: #b8c8fc;
+  --color-door-locked: #b85454;
+  --color-door-locked-shadow: #6c3030;
+  --color-wall-breakable: #d08030;
+  --color-wall-breakable-shadow: #8a5018;
+  --color-wall-breakable-glow: #f0a848;
+  --color-marker-stair: #5c4030;
+}
+
+html[data-theme='nes'] .room--filled {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 10px,
+      rgba(0, 0, 0, 0.12) 10px,
+      rgba(0, 0, 0, 0.12) 11px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 10px,
+      rgba(0, 0, 0, 0.12) 10px,
+      rgba(0, 0, 0, 0.12) 11px
+    );
+}
+
+html[data-theme='nes'] .room__marker--staircase-linked:hover,
+html[data-theme='nes'] .room__marker--staircase-linked:focus-visible {
+  outline-color: #5c5c5c;
+}
+
+/* Palette des salles : Ocarina of Time (N64, 32-bits) */
+html[data-theme='oot32'] {
+  --color-wall: #6a4830;
+  --color-wall-dark: #442c1c;
+  --color-floor: #4a9048;
+  --color-floor-light: #68b060;
+  --color-door: #e0d4b8;
+  --color-door-shadow: #504840;
+  --color-empty: #121820;
+  --color-empty-pattern: #1a2430;
+  --color-entrance: #44b044;
+  --color-entrance-glow: #78d878;
+  --color-marker-stair: #584838;
+  --color-door-locked: #e8c838;
+  --color-door-locked-shadow: #987818;
+  --color-wall-breakable: #c07830;
+  --color-wall-breakable-shadow: #885018;
+  --color-wall-breakable-glow: #e8a848;
+}
+
+html[data-theme='oot32'] .room--filled {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 10px,
+      rgba(0, 0, 0, 0.06) 10px,
+      rgba(0, 0, 0, 0.06) 11px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 10px,
+      rgba(0, 0, 0, 0.06) 10px,
+      rgba(0, 0, 0, 0.06) 11px
+    );
+}
+
+html[data-theme='oot32'] .room__marker--staircase-linked:hover,
+html[data-theme='oot32'] .room__marker--staircase-linked:focus-visible {
+  outline-color: #c8a858;
 }
 
 *,
@@ -119,6 +248,23 @@ body {
 }
 
 .size-form__field input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.size-form__field select {
+  min-width: 8.5rem;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.size-form__field select:focus {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
 }
@@ -859,7 +1005,7 @@ body {
 
 .room__marker--staircase-linked:hover,
 .room__marker--staircase-linked:focus-visible {
-  outline: 2px solid #c4a882;
+  outline: 2px solid #584838;
   outline-offset: 1px;
 }
 
@@ -879,15 +1025,15 @@ body {
       0deg,
       transparent,
       transparent 10px,
-      rgba(0, 0, 0, 0.08) 10px,
-      rgba(0, 0, 0, 0.08) 11px
+      rgba(0, 0, 0, 0.1) 10px,
+      rgba(0, 0, 0, 0.1) 11px
     ),
     repeating-linear-gradient(
       90deg,
       transparent,
       transparent 10px,
-      rgba(0, 0, 0, 0.08) 10px,
-      rgba(0, 0, 0, 0.08) 11px
+      rgba(0, 0, 0, 0.1) 10px,
+      rgba(0, 0, 0, 0.1) 11px
     );
 }
 
@@ -1033,30 +1179,6 @@ body {
   pointer-events: none;
   z-index: -1;
   transform: translateX(-200vw);
-  --color-wall: #1a1830;
-  --color-wall-dark: #0e0c1a;
-  --color-floor: #c49a3c;
-  --color-door: #fffef5;
-  --color-door-shadow: #8a7a50;
-  --color-empty: #2a2a3a;
-  --color-empty-pattern: #353548;
-  --color-bg: #1a1a28;
-  --color-text: #e8e4d8;
-  --color-text-muted: #a8a4a0;
-  --color-accent: #6ab04c;
-  --color-entrance: #4a9fd4;
-  --color-entrance-glow: #7ec8f0;
-  --color-marker-chest: #f2ebe0;
-  --chest-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='12' width='16' height='8' rx='1' fill='%236b4423' stroke='%23e8c84c' stroke-width='1.3'/%3E%3Cpath fill='%236b4423' stroke='%23e8c84c' stroke-width='1.3' stroke-linejoin='round' d='M4 12h16v-2c0-3.3-3.6-6-8-6S4 6.7 4 10v2z'/%3E%3Crect x='4' y='11.1' width='16' height='1.8' fill='%23d4aa4c'/%3E%3Crect x='10' y='9.2' width='4' height='5.2' rx='0.6' fill='%234a3018' stroke='%23e8c84c' stroke-width='1'/%3E%3Ccircle cx='12' cy='10.3' r='0.9' fill='%23e8c84c'/%3E%3C/svg%3E");
-  --color-marker-boss: #0e0c1a;
-  --boss-skull-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23f0e8e8' d='M12 2C7.03 2 3 5.58 3 10c0 2.74 1.48 5.14 3.69 6.45L6 20h3v-2h6v2h3l-.69-3.55C19.52 15.14 21 12.74 21 10c0-4.42-4.03-8-9-8zm-4 8.5a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm-6.5 3.5h5v1h-5v-1z'/%3E%3C/svg%3E");
-  --color-marker-stair: #8a5a30;
-  --color-door-locked: #8b4545;
-  --color-door-locked-shadow: #5c2a2a;
-  --color-wall-breakable: #c87830;
-  --color-wall-breakable-shadow: #8a4a18;
-  --color-wall-breakable-glow: #e8a050;
-  --color-border: #4a4a68;
   --cell-size-max: 56px;
   --grid-gap: 2px;
   --grid-ruler-size: 1.15rem;

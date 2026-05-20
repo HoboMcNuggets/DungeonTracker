@@ -107,7 +107,13 @@ function normalizeTabFromStorage(tab, index) {
     activeFloorId = floor.id;
   }
 
-  return { id: tabId, name: tabName, floors, activeFloorId };
+  return {
+    id: tabId,
+    name: tabName,
+    theme: normalizeMapThemeId(tab.theme),
+    floors,
+    activeFloorId,
+  };
 }
 
 function createEmptyTab(name) {
@@ -115,6 +121,7 @@ function createEmptyTab(name) {
   return {
     id: generateTabId(),
     name: normalizeTabName(name, defaultTabName(1)),
+    theme: normalizeMapThemeId(MAP_THEME_DEFAULT),
     floors: [floor],
     activeFloorId: floor.id,
   };
@@ -186,6 +193,7 @@ function saveMapTabsToStorage() {
       tabs: mapTabsState.tabs.map((tab) => ({
         id: tab.id,
         name: tab.name,
+        theme: normalizeMapThemeId(tab.theme),
         activeFloorId: tab.activeFloorId,
         floors: tab.floors.map((floor) => ({
           id: floor.id,

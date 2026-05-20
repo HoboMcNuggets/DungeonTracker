@@ -21,6 +21,7 @@
   const mapTabsContainer = document.getElementById('map-tabs-container');
   const floorTabsContainer = document.getElementById('floor-tabs-container');
   const exportImageBtn = document.getElementById('export-image-btn');
+  const mapThemeSelect = document.getElementById('map-theme');
   const gridSection = document.getElementById('grid-section');
   const mapZoomInBtn = document.getElementById('map-zoom-in');
   const mapZoomOutBtn = document.getElementById('map-zoom-out');
@@ -223,6 +224,11 @@
     refreshFloorTabs();
   }
 
+  function syncMapThemeFromActiveTab() {
+    applyActiveTabMapTheme();
+    syncMapThemeSelect(mapThemeSelect);
+  }
+
   function handleTabSelect(tabId) {
     if (getActiveTabId() === tabId && showAllFloors) return;
     if (getActiveTabId() !== tabId && !switchToTab(tabId)) return;
@@ -232,6 +238,7 @@
     showPiecesView();
     refreshGrid();
     refreshChrome();
+    syncMapThemeFromActiveTab();
   }
 
   function handleTabAdd() {
@@ -242,6 +249,7 @@
     showPiecesView();
     refreshGrid();
     refreshChrome();
+    syncMapThemeFromActiveTab();
   }
 
   function handleTabRename(tabId, name) {
@@ -265,6 +273,7 @@
     showPiecesView();
     refreshGrid();
     refreshChrome();
+    syncMapThemeFromActiveTab();
   }
 
   function handleFloorSelect(floorId) {
@@ -389,9 +398,9 @@
 
       const breakableBtn = breakableWallButtons[side];
       if (!breakableBtn) continue;
-      breakableBtn.hidden = false;
-      breakableBtn.disabled = isEntrance;
-      const breakable = cell.breakableWalls[side];
+      breakableBtn.hidden = !hasDoor;
+      breakableBtn.disabled = !hasDoor || isEntrance;
+      const breakable = hasDoor && cell.breakableWalls[side];
       breakableBtn.classList.toggle('btn--breakable-wall-active', breakable);
       breakableBtn.setAttribute('aria-pressed', breakable ? 'true' : 'false');
     }
@@ -1100,7 +1109,9 @@
   initBreakableWallToggles();
   initStaircaseToggles();
   initPalette();
+  initMapTheme(mapThemeSelect);
   initMapTabs();
+  syncMapThemeFromActiveTab();
   syncSizeInputsFromGrid();
   refreshChrome();
   refreshGrid();

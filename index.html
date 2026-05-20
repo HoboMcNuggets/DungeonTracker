@@ -1,10 +1,11 @@
 ﻿<!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="alttp">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Old School Dungeon Drawer</title>
   <link rel="stylesheet" href="css/styles.css">
+  <script src="js/mapTheme.js"></script>
 </head>
 <body>
   <header class="header">
@@ -20,6 +21,15 @@
       <div class="size-form__field">
         <label for="grid-height">Hauteur</label>
         <input type="number" id="grid-height" name="height" min="1" max="20" value="10" required>
+      </div>
+      <div class="size-form__field">
+        <label for="map-theme">Palette</label>
+        <select id="map-theme" name="map-theme" aria-label="Palette des salles">
+          <option value="classic">Classique</option>
+          <option value="nes">8-bit</option>
+          <option value="alttp" selected>16-bit</option>
+          <option value="oot32">32-bits</option>
+        </select>
       </div>
       <button type="submit" class="btn btn--primary btn--compact">Appliquer</button>
       <button type="button" id="export-image-btn" class="btn btn--secondary btn--compact">
