@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   const MIN_SIZE = 1;
   const MAX_SIZE = 20;
 
@@ -6,8 +6,7 @@
   const widthInput = document.getElementById('grid-width');
   const heightInput = document.getElementById('grid-height');
   const sizeMessage = document.getElementById('size-message');
-  const gridContainer = document.getElementById('grid-container');
-  const staircaseLinksOverlay = document.getElementById('staircase-links-overlay');
+  const floorsView = document.getElementById('floors-view');
   const piecesPanel = document.getElementById('pieces-panel');
   const paletteContainer = document.getElementById('palette-container');
   const editPanel = document.getElementById('edit-panel');
@@ -21,15 +20,138 @@
   const mapTabsContainer = document.getElementById('map-tabs-container');
   const floorTabsContainer = document.getElementById('floor-tabs-container');
   const exportImageBtn = document.getElementById('export-image-btn');
+  const gridSection = document.getElementById('grid-section');
+  const mapZoomInBtn = document.getElementById('map-zoom-in');
+  const mapZoomOutBtn = document.getElementById('map-zoom-out');
+  const mapZoomLabel = document.getElementById('map-zoom-label');
 
   let activeCell = null;
   let hoveredStaircaseLetter = null;
+  let showAllFloors = false;
   const markerButtons = {};
   const staircaseButtons = {};
   const entranceButtons = {};
   const lockButtons = {};
 
+  function getGridContainerFromTarget(target) {
+    return target?.closest?.('.grid-container--editable') ?? null;
+  }
+
+  function getActiveGridContainer() {
+    const activeId = getActiveFloorId();
+    if (!activeId) return null;
+    return (
+      floorsView.querySelector(
+        `.grid-container--editable[data-floor-id="${activeId}"]`
+      ) ?? floorsView.querySelector('.floor-block--active .grid-container--editable')
+    );
+  }
+
+  function getStaircaseLinksOverlay() {
+    return (
+      floorsView.querySelector('.floor-block--active .staircase-links-overlay') ??
+      floorsView.querySelector('#staircase-links-overlay')
+    );
+  }
+
+  function getFloorIdFromGridContainer(gridContainer) {
+    return gridContainer?.dataset.floorId ?? getActiveFloorId();
+  }
+
+  function runOnFloorGrid(floorId, fn) {
+    syncActiveFloorFromGrid();
+    const activeId = getActiveFloorId();
+    const targetFloor = getFloorById(floorId);
+    if (!targetFloor) return;
+
+    if (floorId === activeId) {
+      fn();
+      syncActiveFloorFromGrid();
+      return;
+    }
+
+    const activeFloor = getFloorById(activeId);
+    setGridState(cloneGridState(targetFloor.grid));
+    fn();
+    targetFloor.grid = cloneGridState(getGridState());
+    if (activeFloor) {
+      setGridState(cloneGridState(activeFloor.grid));
+    }
+  }
+
+  function cloneCellData(cell) {
+    if (!cell) return null;
+    return {
+      presetId: cell.presetId,
+      markers: [...cell.markers],
+      staircases: [...cell.staircases],
+      lockedDoors: { ...cell.lockedDoors },
+      entranceSide: cell.entranceSide,
+    };
+  }
+
+  function getCellInFloorGrid(grid, x, y) {
+    if (y < 0 || y >= grid.height || x < 0 || x >= grid.width) return null;
+    return normalizeCell(grid.cells[y]?.[x]);
+  }
+
+  function moveCellBetweenFloors(
+    sourceFloorId,
+    fromX,
+    fromY,
+    targetFloorId,
+    toX,
+    toY
+  ) {
+    syncActiveFloorFromGrid();
+    const sourceFloor = getFloorById(sourceFloorId);
+    const targetFloor = getFloorById(targetFloorId);
+    if (!sourceFloor || !targetFloor) return false;
+
+    const sourceGrid = cloneGridState(
+      sourceFloorId === getActiveFloorId()
+        ? getGridState()
+        : sourceFloor.grid
+    );
+    const targetGrid = cloneGridState(
+      targetFloorId === getActiveFloorId()
+        ? getGridState()
+        : targetFloor.grid
+    );
+
+    const sourceCell = getCellInFloorGrid(sourceGrid, fromX, fromY);
+    if (!sourceCell) return false;
+    if (getCellInFloorGrid(targetGrid, toX, toY)) return false;
+
+    targetGrid.cells[toY][toX] = cloneCellData(sourceCell);
+    sourceGrid.cells[fromY][fromX] = null;
+
+    sourceFloor.grid = sourceGrid;
+    targetFloor.grid = targetGrid;
+
+    if (
+      getActiveFloorId() === sourceFloorId ||
+      getActiveFloorId() === targetFloorId
+    ) {
+      loadActiveFloorIntoEditor();
+    }
+    return true;
+  }
+
+  function focusFloorForEdit(floorId) {
+    if (!floorId || getActiveFloorId() === floorId) return;
+    syncActiveFloorFromGrid();
+    switchToFloor(floorId);
+    syncSizeInputsFromGrid();
+    if (showAllFloors) {
+      refreshGrid();
+      refreshFloorTabs();
+    }
+  }
+
   function syncCell(x, y) {
+    const gridContainer = getActiveGridContainer();
+    if (!gridContainer) return;
     const cellEl = getCellElement(gridContainer, x, y);
     if (cellEl) {
       updateCellElement(cellEl, getCell(x, y));
@@ -52,6 +174,7 @@
       onAdd: handleTabAdd,
       onRename: handleTabRename,
       onDelete: handleTabDelete,
+      onReorder: handleMapTabReorder,
     });
   }
 
@@ -61,7 +184,19 @@
       onAdd: handleFloorAdd,
       onRename: handleFloorRename,
       onDelete: handleFloorDelete,
+      onReorder: handleFloorReorder,
     });
+  }
+
+  function handleMapTabReorder(sourceTabId, targetTabId) {
+    if (!reorderMapTabs(sourceTabId, targetTabId)) return;
+    refreshChrome();
+  }
+
+  function handleFloorReorder(sourceFloorId, targetFloorId) {
+    if (!reorderFloors(sourceFloorId, targetFloorId)) return;
+    refreshFloorTabs();
+    refreshGrid();
   }
 
   function refreshChrome() {
@@ -70,7 +205,8 @@
   }
 
   function handleTabSelect(tabId) {
-    if (!switchToTab(tabId)) return;
+    if (getActiveTabId() !== tabId && !switchToTab(tabId)) return;
+    showAllFloors = true;
     activeCell = null;
     syncSizeInputsFromGrid();
     showPiecesView();
@@ -80,6 +216,7 @@
 
   function handleTabAdd() {
     createMapTab();
+    showAllFloors = true;
     activeCell = null;
     syncSizeInputsFromGrid();
     showPiecesView();
@@ -97,7 +234,7 @@
     if (!tab) return;
 
     const confirmed = await showConfirm(
-      `Supprimer la carte « ${tab.name} » ? Tous ses étages seront perdus.`
+      `Supprimer la carte Â« ${tab.name} Â» ? Tous ses Ã©tages seront perdus.`
     );
     if (!confirmed) return;
 
@@ -111,7 +248,8 @@
   }
 
   function handleFloorSelect(floorId) {
-    if (!switchToFloor(floorId)) return;
+    if (getActiveFloorId() !== floorId && !switchToFloor(floorId)) return;
+    showAllFloors = false;
     activeCell = null;
     syncSizeInputsFromGrid();
     showPiecesView();
@@ -121,6 +259,7 @@
 
   function handleFloorAdd() {
     createFloor();
+    showAllFloors = false;
     activeCell = null;
     syncSizeInputsFromGrid();
     showPiecesView();
@@ -138,7 +277,7 @@
     if (!floor) return;
 
     const confirmed = await showConfirm(
-      `Supprimer l'étage « ${floor.name} » ? Cette action est irréversible.`
+      `Supprimer l'Ã©tage Â« ${floor.name} Â» ? Cette action est irrÃ©versible.`
     );
     if (!confirmed) return;
 
@@ -163,7 +302,7 @@
       const clamped = Math.min(MAX_SIZE, Math.max(MIN_SIZE, value));
       input.value = String(clamped);
       showSizeMessage(
-        `Valeur ajustée entre ${MIN_SIZE} et ${MAX_SIZE}.`,
+        `Valeur ajustÃ©e entre ${MIN_SIZE} et ${MAX_SIZE}.`,
         true
       );
       return clamped;
@@ -178,9 +317,11 @@
     piecesPanel.setAttribute('aria-hidden', 'false');
     editPanel.classList.add('sidebar-view--hidden');
     editPanel.setAttribute('aria-hidden', 'true');
-    gridContainer.querySelectorAll('.grid-cell--active').forEach((el) => {
-      el.classList.remove('grid-cell--active');
-    });
+    getActiveGridContainer()
+      ?.querySelectorAll('.grid-cell--active')
+      .forEach((el) => {
+        el.classList.remove('grid-cell--active');
+      });
   }
 
   function updateEditToggles() {
@@ -229,12 +370,14 @@
 
   function showEditView(x, y) {
     activeCell = { x, y };
+    const gridContainer = getActiveGridContainer();
+    if (!gridContainer) return;
     setActiveCell(gridContainer, x, y);
 
     const cell = getCell(x, y);
     const preset = cell ? getPresetById(cell.presetId) : null;
     editHint.textContent = preset
-      ? `Case ${formatCellCoord(x, y)} — ${preset.label}`
+      ? `Case ${formatCellCoord(x, y)} â€” ${preset.label}`
       : `Case ${formatCellCoord(x, y)}`;
 
     renderSectionedPalette(editPresetContainer, getPresetSections(), {
@@ -258,15 +401,23 @@
 
   function handleDrop(x, y, presetId) {
     const preset = getPresetById(presetId);
-    if (!preset || preset.isEmpty) return;
+    if (!preset || preset.isEmpty) return false;
 
     setCell(x, y, presetId);
-    syncCell(x, y);
-    syncMapTabFromGrid();
+    return true;
+  }
+
+  function handleDropOnFloor(floorId, x, y, presetId) {
+    runOnFloorGrid(floorId, () => handleDrop(x, y, presetId));
+    if (showAllFloors) {
+      refreshGrid();
+    } else {
+      syncCell(x, y);
+    }
   }
 
   function handleMove(fromX, fromY, toX, toY) {
-    if (!moveCell(fromX, fromY, toX, toY)) return;
+    if (!moveCell(fromX, fromY, toX, toY)) return null;
 
     const wasEditingMovedCell =
       activeCell && activeCell.x === fromX && activeCell.y === fromY;
@@ -275,11 +426,58 @@
       activeCell = { x: toX, y: toY };
     }
 
-    refreshGrid();
-    syncMapTabFromGrid();
+    return { wasEditingMovedCell };
+  }
 
-    if (wasEditingMovedCell) {
-      showEditView(toX, toY);
+  function handleMoveOnFloor(
+    targetFloorId,
+    fromX,
+    fromY,
+    toX,
+    toY,
+    sourceFloorId = null
+  ) {
+    const sourceId = sourceFloorId || targetFloorId;
+    let editAfter = null;
+
+    if (sourceId !== targetFloorId) {
+      const wasEditing =
+        activeCell &&
+        getActiveFloorId() === sourceId &&
+        activeCell.x === fromX &&
+        activeCell.y === fromY;
+
+      if (
+        !moveCellBetweenFloors(
+          sourceId,
+          fromX,
+          fromY,
+          targetFloorId,
+          toX,
+          toY
+        )
+      ) {
+        return;
+      }
+
+      if (wasEditing) {
+        activeCell = null;
+        showPiecesView();
+      }
+    } else {
+      let moveResult = null;
+      runOnFloorGrid(targetFloorId, () => {
+        moveResult = handleMove(fromX, fromY, toX, toY);
+      });
+      if (!moveResult) return;
+      if (moveResult.wasEditingMovedCell) {
+        editAfter = { x: toX, y: toY };
+      }
+    }
+
+    refreshGrid();
+    if (editAfter) {
+      showEditView(editAfter.x, editAfter.y);
     }
   }
 
@@ -292,7 +490,7 @@
 
     const preset = getPresetById(presetId);
     editHint.textContent = preset
-      ? `Case ${formatCellCoord(activeCell.x, activeCell.y)} — ${preset.label}`
+      ? `Case ${formatCellCoord(activeCell.x, activeCell.y)} â€” ${preset.label}`
       : editHint.textContent;
     updateEditToggles();
     syncMapTabFromGrid();
@@ -367,12 +565,15 @@
 
   function clearStaircaseLinksOverlay() {
     hoveredStaircaseLetter = null;
+    const staircaseLinksOverlay = getStaircaseLinksOverlay();
     if (staircaseLinksOverlay) {
       staircaseLinksOverlay.replaceChildren();
     }
   }
 
   function getCellCenterInContainer(x, y) {
+    const gridContainer = getActiveGridContainer();
+    if (!gridContainer) return null;
     const cellEl = getCellElement(gridContainer, x, y);
     if (!cellEl) return null;
 
@@ -385,7 +586,11 @@
   }
 
   function updateStaircaseLinksOverlay(letter) {
+    const staircaseLinksOverlay = getStaircaseLinksOverlay();
     if (!staircaseLinksOverlay) return;
+
+    const gridContainer = getActiveGridContainer();
+    if (!gridContainer) return;
 
     const positions = findStaircasePositionsInGrid(getGridState(), letter);
     if (positions.length < 2) {
@@ -441,6 +646,7 @@
     clearStaircaseLinksOverlay();
     if (!switchToFloor(targetFloorId)) return;
 
+    showAllFloors = false;
     activeCell = null;
     syncSizeInputsFromGrid();
     showPiecesView();
@@ -450,12 +656,58 @@
 
   function refreshGrid() {
     clearStaircaseLinksOverlay();
-    const state = getGridState();
-    renderGrid(gridContainer, state, {
-      activeCell,
-      onDrop: handleDrop,
-      onMove: handleMove,
-    });
+    const floors = getFloors();
+    const activeFloorId = getActiveFloorId();
+    const floorsToShow = showAllFloors
+      ? floors
+      : floors.filter((floor) => floor.id === activeFloorId);
+
+    floorsView.classList.toggle('floors-view--all', showAllFloors);
+    floorsView.classList.toggle('floors-view--single', !showAllFloors);
+    floorsView.replaceChildren();
+
+    for (const floor of floorsToShow) {
+      const isActive = floor.id === activeFloorId;
+      const block = document.createElement('div');
+      block.className = isActive
+        ? 'floor-block floor-block--active'
+        : 'floor-block floor-block--inactive';
+      block.id = `floor-block-${floor.id}`;
+      block.dataset.floorId = floor.id;
+
+      if (showAllFloors) {
+        const label = document.createElement('h3');
+        label.className = 'floor-block__label';
+        label.textContent = floor.name;
+        label.tabIndex = 0;
+        if (!isActive) {
+          label.addEventListener('click', () => handleFloorSelect(floor.id));
+          label.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              handleFloorSelect(floor.id);
+            }
+          });
+        }
+        block.appendChild(label);
+      }
+
+      const gridState = isActive ? getGridState() : cloneGridState(floor.grid);
+      const { frame } = buildFloorGridFrame(gridState, {
+        editable: true,
+        floorId: floor.id,
+        useGridContainerId: !showAllFloors,
+        activeCell: isActive && !showAllFloors ? activeCell : null,
+        onDrop: (x, y, presetId) => handleDropOnFloor(floor.id, x, y, presetId),
+        onMove: (fromX, fromY, toX, toY, sourceFloorId) =>
+          handleMoveOnFloor(floor.id, fromX, fromY, toX, toY, sourceFloorId),
+      });
+
+      block.appendChild(frame);
+      floorsView.appendChild(block);
+    }
+
+    requestAnimationFrame(refreshMapZoomLayout);
   }
 
   function initMarkerToggles() {
@@ -488,7 +740,7 @@
       btn.setAttribute('aria-pressed', 'false');
       btn.setAttribute(
         'aria-label',
-        `Entrée côté ${DOOR_SIDE_NAMES[side]}`
+        `EntrÃ©e cÃ´tÃ© ${DOOR_SIDE_NAMES[side]}`
       );
       btn.addEventListener('click', () => handleEntranceToggle(side));
       entranceButtons[side] = btn;
@@ -542,16 +794,17 @@
   }
 
   function handleClickOutside(event) {
-    if (!activeCell || isDragActive()) return;
+    if (!activeCell || isDragActive() || wasMapPanJustCompleted()) return;
     if (editPanel.contains(event.target)) return;
     if (event.target.closest('.grid-cell--filled')) return;
     showPiecesView();
   }
 
-  function findStaircaseBadgeFromEvent(event) {
+  function findStaircaseBadgeFromEvent(event, gridContainer) {
     if (event.target.closest?.('.room__marker--staircase')) {
       return event.target.closest('.room__marker--staircase');
     }
+    if (!gridContainer) return null;
     const cell = event.target.closest('.grid-cell--filled');
     if (!cell || !gridContainer.contains(cell)) return null;
     const x = parseInt(cell.dataset.x, 10);
@@ -591,10 +844,16 @@
     return hitBadge;
   }
 
-  gridContainer.addEventListener('click', (event) => {
-    if (isDragActive() || wasDragJustCompleted()) return;
+  floorsView.addEventListener('click', (event) => {
+    const gridContainer = getGridContainerFromTarget(event.target);
+    if (!gridContainer) return;
+    if (isDragActive() || wasDragJustCompleted() || wasMapPanJustCompleted()) return;
 
-    const staircaseBadge = findStaircaseBadgeFromEvent(event);
+    if (showAllFloors) {
+      focusFloorForEdit(getFloorIdFromGridContainer(gridContainer));
+    }
+
+    const staircaseBadge = findStaircaseBadgeFromEvent(event, gridContainer);
     if (staircaseBadge) {
       event.preventDefault();
       event.stopPropagation();
@@ -617,8 +876,23 @@
     );
   });
 
-  gridContainer.addEventListener('mousemove', (event) => {
-    const staircaseBadge = findStaircaseBadgeFromEvent(event);
+  floorsView.addEventListener('mousemove', (event) => {
+    const gridContainer = getGridContainerFromTarget(event.target);
+    if (!gridContainer) {
+      if (hoveredStaircaseLetter) {
+        clearStaircaseLinksOverlay();
+      }
+      return;
+    }
+
+    if (showAllFloors && getFloorIdFromGridContainer(gridContainer) !== getActiveFloorId()) {
+      if (hoveredStaircaseLetter) {
+        clearStaircaseLinksOverlay();
+      }
+      return;
+    }
+
+    const staircaseBadge = findStaircaseBadgeFromEvent(event, gridContainer);
     if (staircaseBadge) {
       handleStaircaseHover(staircaseBadge.dataset.staircaseLetter);
       return;
@@ -628,17 +902,20 @@
     }
   });
 
-  gridContainer.addEventListener('mouseleave', () => {
+  floorsView.addEventListener('mouseleave', (event) => {
+    const gridContainer = getActiveGridContainer();
+    if (gridContainer && gridContainer.contains(event.relatedTarget)) return;
     clearStaircaseLinksOverlay();
   });
 
-  window.addEventListener('resize', () => {
-    if (hoveredStaircaseLetter) {
-      updateStaircaseLinksOverlay(hoveredStaircaseLetter);
-    }
-  });
+  floorsView.addEventListener('keydown', (event) => {
+    const gridContainer = getGridContainerFromTarget(event.target);
+    if (!gridContainer) return;
 
-  gridContainer.addEventListener('keydown', (event) => {
+    if (showAllFloors) {
+      focusFloorForEdit(getFloorIdFromGridContainer(gridContainer));
+    }
+
     const staircaseBadge = event.target.closest('.room__marker--staircase');
     if (
       staircaseBadge &&
@@ -681,13 +958,13 @@
   exportImageBtn.addEventListener('click', async () => {
     syncMapTabFromGrid();
     exportImageBtn.disabled = true;
-    showSizeMessage('Export de l’image en cours…');
+    showSizeMessage('Export de lâ€™image en coursâ€¦');
 
     try {
       await exportPlanAsImage();
-      showSizeMessage('Image exportée.');
+      showSizeMessage('Image exportÃ©e.');
     } catch {
-      showSizeMessage('Échec de l’export image.');
+      showSizeMessage('Ã‰chec de lâ€™export image.');
     } finally {
       exportImageBtn.disabled = false;
       refreshGrid();
@@ -700,7 +977,25 @@
     }
   });
 
-  setupGridDragCleanup(gridContainer);
+  setupGridDragCleanup(floorsView);
+  initMapZoom({
+    gridSection,
+    zoomInBtn: mapZoomInBtn,
+    zoomOutBtn: mapZoomOutBtn,
+    zoomLabel: mapZoomLabel,
+    onZoomChange: () => {
+      if (hoveredStaircaseLetter) {
+        updateStaircaseLinksOverlay(hoveredStaircaseLetter);
+      }
+    },
+  });
+
+  window.addEventListener('resize', () => {
+    refreshMapZoomLayout();
+    if (hoveredStaircaseLetter) {
+      updateStaircaseLinksOverlay(hoveredStaircaseLetter);
+    }
+  });
   initMarkerToggles();
   initEntranceToggles();
   initLockToggles();

@@ -323,6 +323,36 @@ function deleteMapTab(tabId) {
   return true;
 }
 
+function reorderItemsById(items, sourceId, targetId) {
+  const fromIndex = items.findIndex((item) => item.id === sourceId);
+  const toIndex = items.findIndex((item) => item.id === targetId);
+  if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return false;
+
+  const [moved] = items.splice(fromIndex, 1);
+  items.splice(toIndex, 0, moved);
+  return true;
+}
+
+function reorderMapTabs(sourceTabId, targetTabId) {
+  syncActiveFloorFromGrid();
+  if (!reorderItemsById(mapTabsState.tabs, sourceTabId, targetTabId)) {
+    return false;
+  }
+  persistMapTabs();
+  return true;
+}
+
+function reorderFloors(sourceFloorId, targetFloorId) {
+  syncActiveFloorFromGrid();
+  const tab = getActiveTab();
+  if (!tab) return false;
+  if (!reorderItemsById(tab.floors, sourceFloorId, targetFloorId)) {
+    return false;
+  }
+  persistMapTabs();
+  return true;
+}
+
 function deleteFloor(floorId) {
   const tab = getActiveTab();
   if (!tab || tab.floors.length <= 1) return false;

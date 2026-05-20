@@ -9,7 +9,7 @@
 <body>
   <header class="header">
     <h1 class="header__title" title="Glissez une pièce sur la grille — cliquez sur une salle pour l'éditer">
-      <a href="https://twitch.tv/nevroze" class="header__title-link" target="_blank" rel="noopener noreferrer">Nevroze</a> Old School vrai gamer dungeon drawer
+      <a href="https://twitch.tv/nevroze" class="header__title-link" target="_blank" rel="noopener noreferrer" title="Le vrai gamer">Nevroze</a> Old School vrai gamer dungeon drawer
     </h1>
 
     <form id="size-form" class="size-form" aria-label="Configuration de la grille">
@@ -39,16 +39,27 @@
   </header>
 
   <main class="main">
-    <section class="grid-section" aria-label="Grille du donjon">
-      <div class="grid-frame">
-        <div class="grid-frame__corner" aria-hidden="true"></div>
-        <div id="grid-col-labels" class="grid-frame__col-labels" aria-hidden="true"></div>
-        <div id="grid-row-labels" class="grid-frame__row-labels" aria-hidden="true"></div>
-        <div class="grid-container-wrap">
-          <div id="grid-container" class="grid-container" role="grid"></div>
-          <svg id="staircase-links-overlay" class="staircase-links-overlay" aria-hidden="true"></svg>
-        </div>
+    <section id="grid-section" class="grid-section" aria-label="Grille du donjon">
+      <div class="map-zoom-toolbar" aria-label="Zoom de la carte">
+        <button
+          type="button"
+          id="map-zoom-out"
+          class="map-zoom-toolbar__btn"
+          aria-label="Dézoomer de 10 pour cent"
+        >
+          −
+        </button>
+        <span id="map-zoom-label" class="map-zoom-toolbar__label" aria-live="polite">100%</span>
+        <button
+          type="button"
+          id="map-zoom-in"
+          class="map-zoom-toolbar__btn"
+          aria-label="Zoomer de 10 pour cent"
+        >
+          +
+        </button>
       </div>
+      <div id="floors-view" class="floors-view"></div>
     </section>
 
     <aside class="sidebar" aria-label="Pièces et édition">
@@ -105,6 +116,7 @@
   <script src="js/staircases.js"></script>
   <script src="js/dragDrop.js"></script>
   <script src="js/renderer.js"></script>
+  <script src="js/mapZoom.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="js/imageExport.js"></script>
   <script src="js/confirmDialog.js"></script>

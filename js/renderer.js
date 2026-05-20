@@ -1,4 +1,4 @@
-﻿const EDGES = ['n', 'e', 's', 'w'];
+const EDGES = ['n', 'e', 's', 'w'];
 
 function columnToLetter(x) {
   return String.fromCharCode(65 + x);
@@ -17,10 +17,10 @@ function formatCellLabel(x, y, preset, cellData) {
       .map((id) => getMarkerById(id)?.label)
       .filter(Boolean);
     if (markerLabels.length) {
-      label += ` — ${markerLabels.join(', ')}`;
+      label += ` � ${markerLabels.join(', ')}`;
     }
     if (cellData.entranceSide) {
-      label += ` — entrée ${DOOR_SIDE_ARROWS[cellData.entranceSide]}`;
+      label += ` � entr�e ${DOOR_SIDE_ARROWS[cellData.entranceSide]}`;
     }
     if (preset) {
       const locked = EDGES.filter(
@@ -28,11 +28,11 @@ function formatCellLabel(x, y, preset, cellData) {
       ).map((side) => DOOR_SIDE_ARROWS[side]);
       if (locked.length) {
         const plural = locked.length > 1;
-        label += ` — porte${plural ? 's' : ''} verrouillée${plural ? 's' : ''} ${locked.join(', ')}`;
+        label += ` � porte${plural ? 's' : ''} verrouill�e${plural ? 's' : ''} ${locked.join(', ')}`;
       }
     }
     if (cellData.staircases.length) {
-      label += ` — escaliers ${cellData.staircases.join(', ')}`;
+      label += ` � escaliers ${cellData.staircases.join(', ')}`;
     }
   }
 
@@ -118,7 +118,7 @@ function buildRoomElement(preset, cellData = null) {
 }
 
 function buildCellElement(x, y, cellData, options = {}) {
-  const { isActive = false, onDrop, onMove } = options;
+  const { isActive = false, onDrop, onMove, floorId = null } = options;
   const preset = cellData ? getPresetById(cellData.presetId) : null;
   const hasRoom = Boolean(preset);
 
@@ -147,11 +147,12 @@ function buildCellElement(x, y, cellData, options = {}) {
       hasRoom,
       onPlacePreset: onDrop,
       onMoveCell: onMove,
+      floorId,
     });
   }
 
   if (hasRoom && onMove) {
-    attachCellDrag(cell, x, y);
+    attachCellDrag(cell, x, y, floorId);
   }
 
   return cell;
@@ -255,6 +256,84 @@ function renderGridRulers(width, height, colLabelsEl = null, rowLabelsEl = null)
   }
 }
 
+function buildFloorGridFrame(state, options = {}) {
+  const {
+    editable = false,
+    activeCell = null,
+    onDrop,
+    onMove,
+    previewLabel = null,
+    floorId = null,
+    useGridContainerId = true,
+  } = options;
+
+  const frame = document.createElement('div');
+  frame.className = 'grid-frame';
+  frame.style.setProperty('--grid-cols', String(state.width));
+  frame.style.setProperty('--grid-rows', String(state.height));
+
+  const corner = document.createElement('div');
+  corner.className = 'grid-frame__corner';
+  corner.setAttribute('aria-hidden', 'true');
+
+  const colLabels = document.createElement('div');
+  colLabels.className = 'grid-frame__col-labels';
+  colLabels.setAttribute('aria-hidden', 'true');
+
+  const rowLabels = document.createElement('div');
+  rowLabels.className = 'grid-frame__row-labels';
+  rowLabels.setAttribute('aria-hidden', 'true');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'grid-container-wrap';
+
+  const gridContainer = document.createElement('div');
+  gridContainer.className = 'grid-container';
+
+  let staircaseLinksOverlay = null;
+
+  if (editable) {
+    gridContainer.classList.add('grid-container--editable');
+    gridContainer.setAttribute('role', 'grid');
+    if (floorId) {
+      gridContainer.dataset.floorId = floorId;
+    }
+    if (useGridContainerId) {
+      gridContainer.id = 'grid-container';
+    }
+
+    staircaseLinksOverlay = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'svg'
+    );
+    staircaseLinksOverlay.classList.add('staircase-links-overlay');
+    if (useGridContainerId) {
+      staircaseLinksOverlay.id = 'staircase-links-overlay';
+    }
+    staircaseLinksOverlay.setAttribute('aria-hidden', 'true');
+    wrap.append(gridContainer, staircaseLinksOverlay);
+  } else {
+    gridContainer.setAttribute('role', 'img');
+    if (previewLabel) {
+      gridContainer.setAttribute('aria-label', previewLabel);
+    }
+    wrap.appendChild(gridContainer);
+  }
+
+  frame.append(corner, colLabels, rowLabels, wrap);
+
+  renderGrid(gridContainer, state, {
+    colLabelsEl: colLabels,
+    rowLabelsEl: rowLabels,
+    floorId: editable ? floorId : null,
+    activeCell: editable ? activeCell : null,
+    onDrop: editable ? onDrop : undefined,
+    onMove: editable ? onMove : undefined,
+  });
+
+  return { frame, gridContainer, staircaseLinksOverlay };
+}
+
 function buildGridFrameElement(state, options = {}) {
   const cellSize = options.cellSize ?? 'var(--cell-size-max)';
 
@@ -296,6 +375,7 @@ function renderGrid(container, state, options = {}) {
     activeCell = null,
     onDrop,
     onMove,
+    floorId = null,
     colLabelsEl = null,
     rowLabelsEl = null,
   } = options;
@@ -321,6 +401,7 @@ function renderGrid(container, state, options = {}) {
         isActive,
         onDrop,
         onMove,
+        floorId,
       });
       container.appendChild(cell);
     }
@@ -438,6 +519,66 @@ function startSegmentRename(labelEl, itemId, currentName, onRename, options = {}
   input.addEventListener('blur', () => finish(true));
 }
 
+const TAB_REORDER_MIME = 'application/x-dungeon-tab-reorder';
+
+let tabReorderDragId = null;
+let lastTabReorderEndedAt = 0;
+
+function wasTabReorderJustCompleted() {
+  return Date.now() - lastTabReorderEndedAt < 300;
+}
+
+function attachTabReorder(tabBtn, itemId, classPrefix, items, onReorder) {
+  if (!onReorder || items.length < 2) return;
+
+  tabBtn.draggable = true;
+
+  tabBtn.addEventListener('dragstart', (event) => {
+    if (event.target.closest(`.${classPrefix}__close`)) {
+      event.preventDefault();
+      return;
+    }
+    tabReorderDragId = itemId;
+    event.dataTransfer.setData(TAB_REORDER_MIME, itemId);
+    event.dataTransfer.effectAllowed = 'move';
+    tabBtn.classList.add(`${classPrefix}__tab--dragging`);
+  });
+
+  tabBtn.addEventListener('dragend', () => {
+    tabBtn.classList.remove(`${classPrefix}__tab--dragging`);
+    tabReorderDragId = null;
+    tabBtn
+      .closest(`.${classPrefix}`)
+      ?.querySelectorAll(`.${classPrefix}__tab--drop-target`)
+      .forEach((el) => el.classList.remove(`${classPrefix}__tab--drop-target`));
+    lastTabReorderEndedAt = Date.now();
+  });
+
+  tabBtn.addEventListener('dragover', (event) => {
+    if (!event.dataTransfer.types.includes(TAB_REORDER_MIME)) return;
+    if (tabReorderDragId === itemId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    tabBtn.classList.add(`${classPrefix}__tab--drop-target`);
+  });
+
+  tabBtn.addEventListener('dragleave', (event) => {
+    if (!tabBtn.contains(event.relatedTarget)) {
+      tabBtn.classList.remove(`${classPrefix}__tab--drop-target`);
+    }
+  });
+
+  tabBtn.addEventListener('drop', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    tabBtn.classList.remove(`${classPrefix}__tab--drop-target`);
+    const sourceId = event.dataTransfer.getData(TAB_REORDER_MIME);
+    if (sourceId && sourceId !== itemId) {
+      onReorder(sourceId, itemId);
+    }
+  });
+}
+
 function renderSegmentTabs(container, items, activeId, options = {}) {
   const {
     classPrefix = 'map-tabs',
@@ -449,9 +590,11 @@ function renderSegmentTabs(container, items, activeId, options = {}) {
     onAdd,
     onRename,
     onDelete,
+    onReorder,
   } = options;
 
   const canDelete = items.length > 1;
+  const canReorder = items.length > 1 && typeof onReorder === 'function';
 
   container.replaceChildren();
   container.className = classPrefix;
@@ -467,7 +610,9 @@ function renderSegmentTabs(container, items, activeId, options = {}) {
     tabBtn.setAttribute('role', 'tab');
     tabBtn.setAttribute('aria-selected', isActive ? 'true' : 'false');
     tabBtn.dataset.itemId = item.id;
-    tabBtn.title = item.name;
+    tabBtn.title = canReorder
+      ? `${item.name} — glisser pour réordonner`
+      : item.name;
 
     const label = document.createElement('span');
     label.className = `${classPrefix}__label`;
@@ -486,7 +631,8 @@ function renderSegmentTabs(container, items, activeId, options = {}) {
       closeBtn.type = 'button';
       closeBtn.className = `${classPrefix}__close`;
       closeBtn.setAttribute('aria-label', `Supprimer ${item.name}`);
-      closeBtn.textContent = '×';
+      closeBtn.setAttribute('aria-hidden', 'true');
+      closeBtn.textContent = '\u00D7';
       closeBtn.addEventListener('click', (event) => {
         event.stopPropagation();
         onDelete(item.id);
@@ -494,10 +640,13 @@ function renderSegmentTabs(container, items, activeId, options = {}) {
       tabBtn.appendChild(closeBtn);
     }
 
+    if (canReorder) {
+      attachTabReorder(tabBtn, item.id, classPrefix, items, onReorder);
+    }
+
     tabBtn.addEventListener('click', () => {
-      if (item.id !== activeId) {
-        onSelect(item.id);
-      }
+      if (wasTabReorderJustCompleted()) return;
+      onSelect(item.id);
     });
 
     container.appendChild(tabBtn);

@@ -54,9 +54,16 @@ function isPresetDrag(event) {
   return event.dataTransfer.types.includes(PRESET_MIME);
 }
 
-function canAcceptCellMove(x, y, hasRoom) {
+function canAcceptCellMove(x, y, hasRoom, targetFloorId = null) {
   if (hasRoom) return false;
   if (!dragSourceCell) return false;
+  if (
+    targetFloorId &&
+    dragSourceCell.floorId &&
+    dragSourceCell.floorId !== targetFloorId
+  ) {
+    return true;
+  }
   return dragSourceCell.x !== x || dragSourceCell.y !== y;
 }
 
@@ -80,13 +87,13 @@ function attachPaletteDrag(item, presetId) {
   });
 }
 
-function attachCellDrag(cellEl, x, y) {
+function attachCellDrag(cellEl, x, y, floorId = null) {
   cellEl.draggable = true;
   cellEl.classList.add('grid-cell--draggable');
 
   cellEl.addEventListener('dragstart', (event) => {
     dragActive = true;
-    dragSourceCell = { x, y };
+    dragSourceCell = { x, y, floorId };
     event.dataTransfer.setData(CELL_MOVE_MIME, `${x},${y}`);
     event.dataTransfer.effectAllowed = 'move';
     cellEl.classList.add('grid-cell--dragging');
@@ -102,11 +109,11 @@ function attachCellDrag(cellEl, x, y) {
 }
 
 function attachCellDropHandlers(cellEl, x, y, handlers) {
-  const { hasRoom, onPlacePreset, onMoveCell } = handlers;
+  const { hasRoom, onPlacePreset, onMoveCell, floorId = null } = handlers;
 
   cellEl.addEventListener('dragover', (event) => {
     if (isCellMoveDrag(event)) {
-      if (!onMoveCell || !canAcceptCellMove(x, y, hasRoom)) return;
+      if (!onMoveCell || !canAcceptCellMove(x, y, hasRoom, floorId)) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
       setDropHighlight(cellEl);
@@ -133,8 +140,8 @@ function attachCellDropHandlers(cellEl, x, y, handlers) {
     clearDropHighlight();
 
     const moveFrom = getCellMoveFromDragEvent(event);
-    if (moveFrom && onMoveCell && canAcceptCellMove(x, y, hasRoom)) {
-      onMoveCell(moveFrom.x, moveFrom.y, x, y);
+    if (moveFrom && onMoveCell && canAcceptCellMove(x, y, hasRoom, floorId)) {
+      onMoveCell(moveFrom.x, moveFrom.y, x, y, dragSourceCell?.floorId ?? null);
       return;
     }
 
@@ -147,6 +154,7 @@ function attachCellDropHandlers(cellEl, x, y, handlers) {
 
 function setupGridDragCleanup(container) {
   container.addEventListener('dragover', (event) => {
+    if (!event.target.closest('.grid-container--editable')) return;
     event.preventDefault();
   });
 
