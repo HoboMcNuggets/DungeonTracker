@@ -1,18 +1,83 @@
 const MIN_SIZE = 1;
 const MAX_SIZE = 20;
+const DEFAULT_GRID_SIZE = 10;
 
-let gridState = {
-  width: 10,
-  height: 10,
-  cells: [],
-};
+const DOOR_SIDES = ['n', 'e', 's', 'w'];
+const DOOR_SIDE_ARROWS = { n: '↑', e: '→', s: '↓', w: '←' };
+const DOOR_SIDE_NAMES = { n: 'nord', e: 'est', s: 'sud', w: 'ouest' };
+const REMOVED_MARKER_IDS = new Set(['key', 'entrance']);
+
+const EMPTY_LOCKED_DOORS = { n: false, e: false, s: false, w: false };
+
+let gridState = createGrid(DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE);
 
 function createEmptyCellData(presetId) {
   return {
     presetId,
     markers: [],
-    staircase: null,
+    staircases: [],
+    lockedDoors: { ...EMPTY_LOCKED_DOORS },
+    entranceSide: null,
   };
+}
+
+function sanitizeMarkers(markers) {
+  return (Array.isArray(markers) ? markers : []).filter(
+    (id) => !REMOVED_MARKER_IDS.has(id)
+  );
+}
+
+function normalizeEntranceSide(cell, preset) {
+  let side = cell.entranceSide ?? null;
+  if (side && !DOOR_SIDES.includes(side)) {
+    side = null;
+  }
+  if (side && !preset?.doors[side]) {
+    side = null;
+  }
+
+  const markers = Array.isArray(cell.markers) ? cell.markers : [];
+  if (!side && markers.includes('entrance') && preset) {
+    side = DOOR_SIDES.find((s) => preset.doors[s]) ?? null;
+  }
+
+  return side;
+}
+
+function normalizeLockedDoors(cell) {
+  const preset = getPresetById(cell.presetId);
+  const raw =
+    cell.lockedDoors && typeof cell.lockedDoors === 'object'
+      ? cell.lockedDoors
+      : EMPTY_LOCKED_DOORS;
+  const locked = { ...EMPTY_LOCKED_DOORS };
+
+  for (const side of DOOR_SIDES) {
+    locked[side] = Boolean(raw[side]) && Boolean(preset?.doors[side]);
+  }
+
+  return locked;
+}
+
+function normalizeStaircases(cell) {
+  if (Array.isArray(cell.staircases)) {
+    const seen = new Set();
+    const letters = [];
+    for (const raw of cell.staircases) {
+      const letter = String(raw).toUpperCase();
+      if (!isValidStaircaseLetter(letter) || seen.has(letter)) continue;
+      seen.add(letter);
+      letters.push(letter);
+    }
+    return letters.sort();
+  }
+
+  if (cell.staircase) {
+    const letter = String(cell.staircase).toUpperCase();
+    return isValidStaircaseLetter(letter) ? [letter] : [];
+  }
+
+  return [];
 }
 
 function normalizeCell(cell) {
@@ -20,20 +85,49 @@ function normalizeCell(cell) {
   if (typeof cell === 'string') {
     return createEmptyCellData(cell);
   }
-  return {
-    presetId: cell.presetId,
-    markers: Array.isArray(cell.markers) ? [...cell.markers] : [],
-    staircase: cell.staircase ? String(cell.staircase).toUpperCase() : null,
+
+  const presetId = cell.presetId;
+  const preset = getPresetById(presetId);
+  const entranceSide = normalizeEntranceSide(cell, preset);
+  const normalized = {
+    presetId,
+    markers: sanitizeMarkers(cell.markers),
+    staircases: normalizeStaircases(cell),
+    lockedDoors: normalizeLockedDoors(cell),
+    entranceSide,
   };
+
+  if (entranceSide) {
+    normalized.lockedDoors[entranceSide] = false;
+  }
+
+  return normalized;
 }
 
-function clampSize(value) {
+function clampSize(value, fallback = DEFAULT_GRID_SIZE) {
   const n = parseInt(value, 10);
-  if (Number.isNaN(n)) return MIN_SIZE;
+  if (Number.isNaN(n)) return fallback;
   return Math.min(MAX_SIZE, Math.max(MIN_SIZE, n));
 }
 
-function createGrid(width, height) {
+function normalizeGridDimensions(grid) {
+  if (!grid || !Array.isArray(grid.cells)) {
+    return { width: DEFAULT_GRID_SIZE, height: DEFAULT_GRID_SIZE };
+  }
+
+  const heightFromCells = grid.cells.length;
+  const widthFromCells = grid.cells.reduce(
+    (max, row) => Math.max(max, Array.isArray(row) ? row.length : 0),
+    0
+  );
+
+  return {
+    width: clampSize(grid.width ?? (widthFromCells || DEFAULT_GRID_SIZE)),
+    height: clampSize(grid.height ?? (heightFromCells || DEFAULT_GRID_SIZE)),
+  };
+}
+
+function createGrid(width = DEFAULT_GRID_SIZE, height = DEFAULT_GRID_SIZE) {
   const w = clampSize(width);
   const h = clampSize(height);
   const cells = [];
@@ -44,13 +138,20 @@ function createGrid(width, height) {
     }
     cells.push(row);
   }
-  gridState = { width: w, height: h, cells };
-  return gridState;
+  return { width: w, height: h, cells };
+}
+
+function resizeGrid(width, height) {
+  const current = getGridState();
+  return setGridState({
+    width,
+    height,
+    cells: current.cells,
+  });
 }
 
 function setGridState(state) {
-  const w = clampSize(state.width);
-  const h = clampSize(state.height);
+  const { width: w, height: h } = normalizeGridDimensions(state);
   const cells = [];
 
   for (let y = 0; y < h; y++) {
@@ -103,12 +204,9 @@ function findCellWithMarker(markerId) {
   return null;
 }
 
-function getEntrance() {
-  return findCellWithMarker('entrance');
-}
-
 function isEntrance(x, y) {
-  return hasMarker(x, y, 'entrance');
+  const cell = getCell(x, y);
+  return Boolean(cell?.entranceSide);
 }
 
 function clearMarkerEverywhere(markerId) {
@@ -145,20 +243,55 @@ function toggleMarker(x, y, markerId) {
   return true;
 }
 
-function setStaircase(x, y, letter) {
+function toggleLockedDoor(x, y, side) {
+  const cell = getCell(x, y);
+  if (!cell || !DOOR_SIDES.includes(side)) return false;
+
+  const preset = getPresetById(cell.presetId);
+  if (!preset?.doors[side]) return false;
+  if (cell.entranceSide === side) return false;
+
+  cell.lockedDoors[side] = !cell.lockedDoors[side];
+  gridState.cells[y][x] = cell;
+  return cell.lockedDoors[side];
+}
+
+function toggleEntranceDoor(x, y, side) {
+  const cell = getCell(x, y);
+  if (!cell || !DOOR_SIDES.includes(side)) return false;
+
+  const preset = getPresetById(cell.presetId);
+  if (!preset?.doors[side]) return false;
+
+  if (cell.entranceSide === side) {
+    cell.entranceSide = null;
+    gridState.cells[y][x] = cell;
+    return false;
+  }
+
+  cell.entranceSide = side;
+  cell.lockedDoors[side] = false;
+  gridState.cells[y][x] = cell;
+  return true;
+}
+
+function toggleStaircase(x, y, letter) {
   const cell = getCell(x, y);
   if (!cell) return false;
 
-  if (!letter) {
-    cell.staircase = null;
+  const normalized = String(letter).toUpperCase();
+  if (!isValidStaircaseLetter(normalized)) return false;
+
+  const index = cell.staircases.indexOf(normalized);
+  if (index >= 0) {
+    cell.staircases.splice(index, 1);
   } else {
-    const normalized = String(letter).toUpperCase();
-    if (!/^[A-Z]$/.test(normalized)) return false;
-    cell.staircase = normalized;
+    cell.staircases.push(normalized);
+    cell.staircases.sort();
   }
 
   gridState.cells[y][x] = cell;
-  return true;
+  return index < 0;
 }
 
 function setCell(x, y, presetId) {
@@ -178,10 +311,24 @@ function setCell(x, y, presetId) {
   }
 
   const existing = getCell(x, y);
+  const lockedDoors = existing
+    ? normalizeLockedDoors({ presetId: preset.id, lockedDoors: existing.lockedDoors })
+    : { ...EMPTY_LOCKED_DOORS };
+
+  let entranceSide = existing?.entranceSide ?? null;
+  if (entranceSide && !preset.doors[entranceSide]) {
+    entranceSide = null;
+  }
+  if (entranceSide) {
+    lockedDoors[entranceSide] = false;
+  }
+
   gridState.cells[y][x] = {
     presetId: preset.id,
     markers: existing ? [...existing.markers] : [],
-    staircase: existing ? existing.staircase : null,
+    staircases: existing ? [...existing.staircases] : [],
+    lockedDoors,
+    entranceSide,
   };
   return true;
 }

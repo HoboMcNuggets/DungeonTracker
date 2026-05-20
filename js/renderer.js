@@ -19,17 +19,34 @@ function formatCellLabel(x, y, preset, cellData) {
     if (markerLabels.length) {
       label += ` — ${markerLabels.join(', ')}`;
     }
-    if (cellData.staircase) {
-      label += ` — escalier ${cellData.staircase}`;
+    if (cellData.entranceSide) {
+      label += ` — entrée ${DOOR_SIDE_ARROWS[cellData.entranceSide]}`;
+    }
+    if (preset) {
+      const locked = EDGES.filter(
+        (side) => preset.doors[side] && cellData.lockedDoors[side]
+      ).map((side) => DOOR_SIDE_ARROWS[side]);
+      if (locked.length) {
+        const plural = locked.length > 1;
+        label += ` — porte${plural ? 's' : ''} verrouillée${plural ? 's' : ''} ${locked.join(', ')}`;
+      }
+    }
+    if (cellData.staircases.length) {
+      label += ` — escaliers ${cellData.staircases.join(', ')}`;
     }
   }
 
   return label;
 }
 
-function buildMarkerBadges(cellData) {
-  const wrap = document.createElement('div');
-  wrap.className = 'room__markers';
+function getMarkersLayoutClass(count) {
+  if (count <= 1) return 'room__markers--single';
+  if (count <= 4) return 'room__markers--grid-2';
+  return 'room__markers--grid-3';
+}
+
+function collectMarkerBadges(cellData) {
+  const badges = [];
 
   for (const markerId of cellData.markers) {
     const marker = getMarkerById(markerId);
@@ -39,18 +56,21 @@ function buildMarkerBadges(cellData) {
     badge.textContent = marker.shortLabel;
     badge.setAttribute('aria-hidden', 'true');
     badge.title = marker.label;
-    wrap.appendChild(badge);
+    badges.push(badge);
   }
 
-  if (cellData.staircase) {
-    const badge = document.createElement('span');
-    badge.className = 'room__marker room__marker--staircase';
-    badge.textContent = cellData.staircase;
-    badge.setAttribute('aria-hidden', 'true');
-    badge.title = `Escalier ${cellData.staircase}`;
-    wrap.appendChild(badge);
+  for (const letter of cellData.staircases) {
+    badges.push(createStaircaseBadge(letter));
   }
 
+  return badges;
+}
+
+function buildMarkerBadges(cellData) {
+  const badges = collectMarkerBadges(cellData);
+  const wrap = document.createElement('div');
+  wrap.className = `room__markers ${getMarkersLayoutClass(badges.length)}`;
+  badges.forEach((badge) => wrap.appendChild(badge));
   return wrap;
 }
 
@@ -64,19 +84,33 @@ function buildRoomElement(preset, cellData = null) {
   }
 
   room.classList.add('room--filled');
-  if (cellData && cellData.markers.includes('entrance')) {
+  if (cellData?.entranceSide) {
     room.classList.add('room--entrance');
   }
 
   for (const side of EDGES) {
     const edge = document.createElement('div');
     const hasDoor = preset.doors[side];
+    const isEntranceDoor = Boolean(hasDoor && cellData?.entranceSide === side);
+    const isLocked = Boolean(
+      hasDoor && cellData?.lockedDoors?.[side] && !isEntranceDoor
+    );
     edge.classList.add('room__edge', `room__edge--${side}`);
     edge.classList.add(hasDoor ? 'room__edge--door' : 'room__edge--wall');
+    if (isEntranceDoor) {
+      edge.classList.add('room__edge--entrance');
+    }
+    if (isLocked) {
+      edge.classList.add('room__edge--locked');
+      const lock = document.createElement('span');
+      lock.className = 'room__edge__lock';
+      lock.setAttribute('aria-hidden', 'true');
+      edge.appendChild(lock);
+    }
     room.appendChild(edge);
   }
 
-  if (cellData && (cellData.markers.length || cellData.staircase)) {
+  if (cellData && (cellData.markers.length || cellData.staircases.length)) {
     room.appendChild(buildMarkerBadges(cellData));
   }
 
@@ -102,7 +136,7 @@ function buildCellElement(x, y, cellData, options = {}) {
   if (isActive) {
     cell.classList.add('grid-cell--active');
   }
-  if (cellData && cellData.markers.includes('entrance')) {
+  if (cellData?.entranceSide) {
     cell.classList.add('grid-cell--entrance');
   }
 
@@ -170,7 +204,7 @@ function updateCellElement(cellEl, cellData) {
   cellEl.classList.toggle('grid-cell--filled', hasRoom);
   cellEl.classList.toggle(
     'grid-cell--entrance',
-    Boolean(cellData && cellData.markers.includes('entrance'))
+    Boolean(cellData?.entranceSide)
   );
   cellEl.setAttribute('role', hasRoom ? 'button' : 'gridcell');
   cellEl.setAttribute('tabindex', hasRoom ? '0' : '-1');
@@ -192,9 +226,11 @@ function buildRowLabel(y) {
   return label;
 }
 
-function renderGridRulers(width, height) {
-  const colLabels = document.getElementById('grid-col-labels');
-  const rowLabels = document.getElementById('grid-row-labels');
+function renderGridRulers(width, height, colLabelsEl = null, rowLabelsEl = null) {
+  const colLabels =
+    colLabelsEl ?? document.getElementById('grid-col-labels');
+  const rowLabels =
+    rowLabelsEl ?? document.getElementById('grid-row-labels');
   if (!colLabels || !rowLabels) return;
 
   colLabels.replaceChildren();
@@ -211,15 +247,58 @@ function renderGridRulers(width, height) {
   }
 }
 
+function buildGridFrameElement(state, options = {}) {
+  const cellSize = options.cellSize ?? 'var(--cell-size-max)';
+
+  const frame = document.createElement('div');
+  frame.className = 'grid-frame export-grid-frame';
+  frame.style.setProperty('--cell-size', cellSize);
+  frame.style.setProperty('--grid-cols', String(state.width));
+  frame.style.setProperty('--grid-rows', String(state.height));
+
+  const corner = document.createElement('div');
+  corner.className = 'grid-frame__corner';
+  corner.setAttribute('aria-hidden', 'true');
+
+  const colLabels = document.createElement('div');
+  colLabels.className = 'grid-frame__col-labels';
+  colLabels.setAttribute('aria-hidden', 'true');
+
+  const rowLabels = document.createElement('div');
+  rowLabels.className = 'grid-frame__row-labels';
+  rowLabels.setAttribute('aria-hidden', 'true');
+
+  const gridContainer = document.createElement('div');
+  gridContainer.className = 'grid-container';
+  gridContainer.setAttribute('role', 'img');
+
+  frame.append(corner, colLabels, rowLabels, gridContainer);
+
+  renderGrid(gridContainer, state, {
+    colLabelsEl: colLabels,
+    rowLabelsEl: rowLabels,
+    activeCell: null,
+  });
+
+  return frame;
+}
+
 function renderGrid(container, state, options = {}) {
-  const { activeCell = null, onDrop } = options;
+  const { activeCell = null, onDrop, colLabelsEl = null, rowLabelsEl = null } =
+    options;
+  const useDedicatedRulers = Boolean(colLabelsEl && rowLabelsEl);
+
   container.replaceChildren();
   container.style.gridTemplateColumns = `repeat(${state.width}, var(--cell-size))`;
-  const root = document.documentElement;
-  root.style.setProperty('--grid-cols', String(state.width));
-  root.style.setProperty('--grid-rows', String(state.height));
 
-  renderGridRulers(state.width, state.height);
+  if (useDedicatedRulers) {
+    renderGridRulers(state.width, state.height, colLabelsEl, rowLabelsEl);
+  } else {
+    const root = document.documentElement;
+    root.style.setProperty('--grid-cols', String(state.width));
+    root.style.setProperty('--grid-rows', String(state.height));
+    renderGridRulers(state.width, state.height);
+  }
 
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {

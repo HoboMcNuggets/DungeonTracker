@@ -1,16 +1,4 @@
 const MARKER_TYPES = {
-  entrance: {
-    id: 'entrance',
-    label: 'Entrée',
-    shortLabel: 'E',
-    unique: true,
-  },
-  key: {
-    id: 'key',
-    label: 'Clé requise',
-    shortLabel: 'K',
-    unique: false,
-  },
   chest: {
     id: 'chest',
     label: 'Coffre',
@@ -19,7 +7,25 @@ const MARKER_TYPES = {
   },
 };
 
-const STAIRCASE_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const STAIRCASE_EXCLUDED = new Set(['E', 'C']);
+const STAIRCASE_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  .split('')
+  .filter((letter) => !STAIRCASE_EXCLUDED.has(letter))
+  .slice(0, 10);
+
+function isValidStaircaseLetter(letter) {
+  const normalized = String(letter).toUpperCase();
+  return STAIRCASE_LETTERS.includes(normalized);
+}
+
+function createStaircaseBadge(letter) {
+  const badge = document.createElement('span');
+  badge.className = 'room__marker room__marker--staircase';
+  badge.textContent = letter;
+  badge.setAttribute('aria-hidden', 'true');
+  badge.title = `Escalier ${letter}`;
+  return badge;
+}
 
 function getMarkerList() {
   return Object.values(MARKER_TYPES);

@@ -18,6 +18,8 @@
   --color-marker-key: #e8c84c;
   --color-marker-chest: #c87848;
   --color-marker-stair: #9b7ed4;
+  --color-door-locked: #8b4545;
+  --color-door-locked-shadow: #5c2a2a;
   --color-border: #4a4a68;
   --cell-size-max: 56px;
   --cell-size: var(--cell-size-max);
@@ -135,6 +137,21 @@ body {
 .btn--compact {
   padding: 0.25rem 0.5rem;
   font-size: 0.8rem;
+}
+
+.btn--secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--color-border);
+}
+
+.btn--secondary:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .btn:focus-visible {
@@ -531,14 +548,29 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
   gap: 2px;
-  max-width: 85%;
+  max-width: 90%;
+  max-height: 90%;
   pointer-events: none;
   z-index: 2;
+}
+
+.room__markers--single {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.room__markers--grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  grid-template-rows: repeat(2, auto);
+}
+
+.room__markers--grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  grid-template-rows: repeat(3, auto);
 }
 
 .room__marker {
@@ -554,14 +586,16 @@ body {
   box-shadow: 0 0 0 1px var(--color-wall-dark);
 }
 
-.room__marker--entrance {
-  background: var(--color-entrance);
-  color: #0a1a28;
+.room__markers--grid-2 .room__marker {
+  width: 0.95rem;
+  height: 0.95rem;
+  font-size: 0.58rem;
 }
 
-.room__marker--key {
-  background: var(--color-marker-key);
-  color: #2a2010;
+.room__markers--grid-3 .room__marker {
+  width: 0.72rem;
+  height: 0.72rem;
+  font-size: 0.48rem;
 }
 
 .room__marker--chest {
@@ -574,6 +608,11 @@ body {
   color: #1a1028;
   border-radius: 4px;
   min-width: 1.15rem;
+}
+
+.room__markers--grid-3 .room__marker--staircase {
+  min-width: 0.72rem;
+  border-radius: 3px;
 }
 
 .room--filled {
@@ -654,6 +693,139 @@ body {
   transform: translateY(-50%);
   height: var(--door-width);
   bottom: auto;
+}
+
+.room__edge--door.room__edge--entrance {
+  background: var(--color-entrance);
+  box-shadow:
+    inset 0 0 0 1px var(--color-entrance-glow),
+    0 0 0 1px var(--color-wall-dark);
+}
+
+.room__edge--door.room__edge--locked {
+  background: var(--color-door-locked);
+  box-shadow:
+    inset 0 0 0 1px var(--color-door-locked-shadow),
+    0 0 0 1px var(--color-wall-dark);
+}
+
+.room__edge__lock {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 0.45rem;
+  height: 0.5rem;
+  border: 1.5px solid #1a1028;
+  border-radius: 2px;
+  background: #c8a030;
+  pointer-events: none;
+}
+
+.room__edge__lock::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -0.28rem;
+  transform: translateX(-50%);
+  width: 0.35rem;
+  height: 0.3rem;
+  border: 1.5px solid #1a1028;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  background: transparent;
+}
+
+.export-host {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: -1;
+  transform: translateX(-200vw);
+  --color-wall: #1a1830;
+  --color-wall-dark: #0e0c1a;
+  --color-floor: #c49a3c;
+  --color-door: #fffef5;
+  --color-door-shadow: #8a7a50;
+  --color-empty: #2a2a3a;
+  --color-empty-pattern: #353548;
+  --color-bg: #1a1a28;
+  --color-text: #e8e4d8;
+  --color-text-muted: #a8a4a0;
+  --color-accent: #6ab04c;
+  --color-entrance: #4a9fd4;
+  --color-entrance-glow: #7ec8f0;
+  --color-marker-chest: #c87848;
+  --color-marker-stair: #9b7ed4;
+  --color-door-locked: #8b4545;
+  --color-door-locked-shadow: #5c2a2a;
+  --color-border: #4a4a68;
+  --cell-size-max: 56px;
+  --grid-gap: 2px;
+  --grid-ruler-size: 1.15rem;
+  --wall-thickness: 8px;
+  --door-width: 42%;
+}
+
+.export-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1rem;
+  background: #1a1a28;
+  width: max-content;
+}
+
+.export-tab-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.export-tab-label {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #e8e4d8;
+  border-bottom: 2px solid #6ab04c;
+  padding-bottom: 0.35rem;
+}
+
+.export-floors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem 1.25rem;
+}
+
+.export-floor-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.export-floor-label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #a8a4a0;
+}
+
+.export-grid-frame {
+  --cell-size: 56px;
+  --cell-from-height: 56px;
+  --cell-from-width: 56px;
+}
+
+.export-host .grid-cell--entrance {
+  box-shadow: none;
+  outline: 2px solid #4a9fd4;
+  outline-offset: -2px;
+}
+
+.export-host .room--entrance.room--filled {
+  box-shadow: none;
 }
 
 .sidebar {
@@ -742,49 +914,90 @@ body {
   background: #2a3a28;
 }
 
-.btn--marker-entrance.btn--marker-active {
-  border-color: var(--color-entrance);
-  background: rgba(74, 159, 212, 0.2);
-}
-
-.btn--marker-key.btn--marker-active {
-  border-color: var(--color-marker-key);
-  background: rgba(232, 200, 76, 0.15);
-}
-
 .btn--marker-chest.btn--marker-active {
   border-color: var(--color-marker-chest);
   background: rgba(200, 120, 72, 0.15);
 }
 
+.entrance-field,
+.lock-field,
 .staircase-field {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
 }
 
-.staircase-field__label {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.8rem;
-  cursor: pointer;
+.door-side-toggles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
 }
 
-.staircase-field__select {
-  flex: 1;
-  min-width: 3.5rem;
-  padding: 0.3rem 0.4rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
+.staircase-toggles {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.25rem;
+}
+
+.btn--entrance-side,
+.btn--lock {
+  padding: 0.28rem 0;
+  font-size: 1rem;
+  line-height: 1;
+  font-weight: 700;
+  text-align: center;
   background: var(--color-bg);
   color: var(--color-text);
-  font-size: 0.85rem;
+  border: 2px solid var(--color-border);
+  border-radius: 4px;
+  min-width: 0;
 }
 
-.staircase-field__select:disabled {
-  opacity: 0.45;
+.btn--entrance-side:hover:not(:disabled),
+.btn--lock:hover:not(:disabled) {
+  background: #2e2e44;
+}
+
+.btn--entrance-side:disabled,
+.btn--lock:disabled {
+  opacity: 0.25;
+}
+
+.btn--entrance-side-active {
+  border-color: var(--color-entrance);
+  background: rgba(74, 159, 212, 0.28);
+  color: var(--color-entrance-glow);
+}
+
+.btn--lock-active {
+  border-color: var(--color-door-locked);
+  background: rgba(139, 69, 69, 0.3);
+  color: #f0d8d8;
+}
+
+.btn--entrance-side[hidden],
+.btn--lock[hidden] {
+  display: none;
+}
+
+.btn--staircase {
+  padding: 0.28rem 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+  border-radius: 4px;
+  min-width: 0;
+}
+
+.btn--staircase:hover {
+  background: #2e2e44;
+}
+
+.btn--staircase-active {
+  border-color: var(--color-marker-stair);
+  background: rgba(155, 126, 212, 0.25);
+  color: #e8e0ff;
 }
 
 .palette-actions--top {
@@ -808,30 +1021,6 @@ body {
 
 .btn--danger:hover {
   background: #d65a5a;
-}
-
-.btn--entrance {
-  background: var(--color-entrance);
-  color: #0a1a28;
-}
-
-.btn--entrance:hover:not(:disabled) {
-  background: var(--color-entrance-glow);
-}
-
-.btn--entrance:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.btn--entrance-active {
-  background: transparent;
-  border: 2px solid var(--color-entrance);
-  color: var(--color-entrance-glow);
-}
-
-.btn--entrance-active:hover:not(:disabled) {
-  background: rgba(74, 159, 212, 0.15);
 }
 
 .palette-sections {

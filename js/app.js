@@ -13,14 +13,19 @@
   const editHint = document.getElementById('edit-hint');
   const editPresetContainer = document.getElementById('edit-preset-container');
   const markerToggles = document.getElementById('marker-toggles');
-  const staircaseEnabled = document.getElementById('staircase-enabled');
-  const staircaseLetter = document.getElementById('staircase-letter');
+  const staircaseToggles = document.getElementById('staircase-toggles');
+  const entranceToggles = document.getElementById('entrance-toggles');
+  const lockToggles = document.getElementById('lock-toggles');
   const deleteCellBtn = document.getElementById('delete-cell-btn');
   const mapTabsContainer = document.getElementById('map-tabs-container');
   const floorTabsContainer = document.getElementById('floor-tabs-container');
+  const exportImageBtn = document.getElementById('export-image-btn');
 
   let activeCell = null;
   const markerButtons = {};
+  const staircaseButtons = {};
+  const entranceButtons = {};
+  const lockButtons = {};
 
   function syncCell(x, y) {
     const cellEl = getCellElement(gridContainer, x, y);
@@ -144,15 +149,6 @@
     refreshFloorTabs();
   }
 
-  function syncCellAndNeighbors(x, y) {
-    const coords = [{ x, y }];
-    const entrance = getEntrance();
-    if (entrance && (entrance.x !== x || entrance.y !== y)) {
-      coords.push(entrance);
-    }
-    syncCellsVisuals(gridContainer, coords);
-  }
-
   function showSizeMessage(text, isWarning = false) {
     sizeMessage.textContent = text;
     sizeMessage.classList.toggle('size-message--warning', isWarning);
@@ -185,7 +181,7 @@
     });
   }
 
-  function updateMarkerButtons() {
+  function updateEditToggles() {
     if (!activeCell) return;
     const cell = getCell(activeCell.x, activeCell.y);
     if (!cell) return;
@@ -198,9 +194,35 @@
       btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
 
-    staircaseEnabled.checked = Boolean(cell.staircase);
-    staircaseLetter.disabled = !cell.staircase;
-    staircaseLetter.value = cell.staircase || '';
+    for (const letter of STAIRCASE_LETTERS) {
+      const btn = staircaseButtons[letter];
+      if (!btn) continue;
+      const active = cell.staircases.includes(letter);
+      btn.classList.toggle('btn--staircase-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+
+    const preset = getPresetById(cell.presetId);
+    for (const side of DOOR_SIDES) {
+      const hasDoor = Boolean(preset?.doors[side]);
+      const isEntrance = hasDoor && cell.entranceSide === side;
+
+      const entranceBtn = entranceButtons[side];
+      if (entranceBtn) {
+        entranceBtn.hidden = !hasDoor;
+        entranceBtn.disabled = !hasDoor;
+        entranceBtn.classList.toggle('btn--entrance-side-active', isEntrance);
+        entranceBtn.setAttribute('aria-pressed', isEntrance ? 'true' : 'false');
+      }
+
+      const lockBtn = lockButtons[side];
+      if (!lockBtn) continue;
+      lockBtn.hidden = !hasDoor;
+      lockBtn.disabled = !hasDoor || isEntrance;
+      const locked = hasDoor && cell.lockedDoors[side];
+      lockBtn.classList.toggle('btn--lock-active', locked);
+      lockBtn.setAttribute('aria-pressed', locked ? 'true' : 'false');
+    }
   }
 
   function showEditView(x, y) {
@@ -219,7 +241,7 @@
       onSelect: handleEditPresetSelect,
     });
 
-    updateMarkerButtons();
+    updateEditToggles();
 
     piecesPanel.classList.add('sidebar-view--hidden');
     piecesPanel.setAttribute('aria-hidden', 'true');
@@ -252,70 +274,52 @@
     editHint.textContent = preset
       ? `Case ${formatCellCoord(activeCell.x, activeCell.y)} — ${preset.label}`
       : editHint.textContent;
-    updateMarkerButtons();
+    updateEditToggles();
     syncMapTabFromGrid();
   }
 
   function handleMarkerToggle(markerId) {
     if (!activeCell) return;
 
-    const previousEntrance = getEntrance();
     toggleMarker(activeCell.x, activeCell.y, markerId);
-
-    const coords = [{ x: activeCell.x, y: activeCell.y }];
-    if (markerId === 'entrance' && previousEntrance) {
-      coords.push(previousEntrance);
-    }
-    const newEntrance = getEntrance();
-    if (newEntrance && markerId === 'entrance') {
-      coords.push(newEntrance);
-    }
-
-    syncCellsVisuals(gridContainer, coords);
-    updateMarkerButtons();
+    syncCell(activeCell.x, activeCell.y);
+    updateEditToggles();
     syncMapTabFromGrid();
   }
 
-  function handleStaircaseToggle() {
+  function handleEntranceToggle(side) {
     if (!activeCell) return;
 
-    if (!staircaseEnabled.checked) {
-      setStaircase(activeCell.x, activeCell.y, null);
-      staircaseLetter.disabled = true;
-      staircaseLetter.value = '';
-    } else {
-      staircaseLetter.disabled = false;
-      const letter = staircaseLetter.value || 'A';
-      staircaseLetter.value = letter;
-      setStaircase(activeCell.x, activeCell.y, letter);
-    }
-
+    toggleEntranceDoor(activeCell.x, activeCell.y, side);
     syncCell(activeCell.x, activeCell.y);
-    updateMarkerButtons();
+    updateEditToggles();
     syncMapTabFromGrid();
   }
 
-  function handleStaircaseLetterChange() {
-    if (!activeCell || !staircaseEnabled.checked) return;
-    const letter = staircaseLetter.value;
-    if (letter) {
-      setStaircase(activeCell.x, activeCell.y, letter);
-      syncCell(activeCell.x, activeCell.y);
-      syncMapTabFromGrid();
-    }
+  function handleStaircaseToggle(letter) {
+    if (!activeCell) return;
+
+    toggleStaircase(activeCell.x, activeCell.y, letter);
+    syncCell(activeCell.x, activeCell.y);
+    updateEditToggles();
+    syncMapTabFromGrid();
+  }
+
+  function handleLockToggle(side) {
+    if (!activeCell) return;
+
+    toggleLockedDoor(activeCell.x, activeCell.y, side);
+    syncCell(activeCell.x, activeCell.y);
+    updateEditToggles();
+    syncMapTabFromGrid();
   }
 
   function handleDeleteCell() {
     if (!activeCell) return;
 
     const { x, y } = activeCell;
-    const previousEntrance = getEntrance();
     setCell(x, y, 'empty');
     syncCell(x, y);
-
-    if (previousEntrance) {
-      syncCellsVisuals(gridContainer, [previousEntrance]);
-    }
 
     showPiecesView();
     syncMapTabFromGrid();
@@ -324,7 +328,14 @@
   function applyGridSize() {
     const width = clampInput(widthInput);
     const height = clampInput(heightInput);
-    createGrid(width, height);
+    const { width: currentWidth, height: currentHeight } = getGridDimensions();
+
+    if (width === currentWidth && height === currentHeight) {
+      showSizeMessage('');
+      return;
+    }
+
+    resizeGrid(width, height);
     showPiecesView();
     refreshGrid();
     syncMapTabFromGrid();
@@ -354,18 +365,64 @@
     }
   }
 
-  function initStaircaseSelect() {
-    staircaseLetter.replaceChildren();
-    const empty = document.createElement('option');
-    empty.value = '';
-    empty.textContent = '—';
-    staircaseLetter.appendChild(empty);
+  function initEntranceToggles() {
+    entranceToggles.replaceChildren();
+
+    for (const side of DOOR_SIDES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--entrance-side';
+      btn.textContent = DOOR_SIDE_ARROWS[side];
+      btn.dataset.side = side;
+      btn.hidden = true;
+      btn.disabled = true;
+      btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute(
+        'aria-label',
+        `Entrée côté ${DOOR_SIDE_NAMES[side]}`
+      );
+      btn.addEventListener('click', () => handleEntranceToggle(side));
+      entranceButtons[side] = btn;
+      entranceToggles.appendChild(btn);
+    }
+  }
+
+  function initLockToggles() {
+    lockToggles.replaceChildren();
+
+    for (const side of DOOR_SIDES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--lock';
+      btn.textContent = DOOR_SIDE_ARROWS[side];
+      btn.dataset.side = side;
+      btn.hidden = true;
+      btn.disabled = true;
+      btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute(
+        'aria-label',
+        `Verrouiller la porte ${DOOR_SIDE_NAMES[side]}`
+      );
+      btn.addEventListener('click', () => handleLockToggle(side));
+      lockButtons[side] = btn;
+      lockToggles.appendChild(btn);
+    }
+  }
+
+  function initStaircaseToggles() {
+    staircaseToggles.replaceChildren();
 
     for (const letter of STAIRCASE_LETTERS) {
-      const opt = document.createElement('option');
-      opt.value = letter;
-      opt.textContent = letter;
-      staircaseLetter.appendChild(opt);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--staircase';
+      btn.dataset.letter = letter;
+      btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute('aria-label', `Escalier ${letter}`);
+      btn.textContent = letter;
+      btn.addEventListener('click', () => handleStaircaseToggle(letter));
+      staircaseButtons[letter] = btn;
+      staircaseToggles.appendChild(btn);
     }
   }
 
@@ -419,8 +476,22 @@
   heightInput.addEventListener('change', () => clampInput(heightInput));
 
   deleteCellBtn.addEventListener('click', handleDeleteCell);
-  staircaseEnabled.addEventListener('change', handleStaircaseToggle);
-  staircaseLetter.addEventListener('change', handleStaircaseLetterChange);
+
+  exportImageBtn.addEventListener('click', async () => {
+    syncMapTabFromGrid();
+    exportImageBtn.disabled = true;
+    showSizeMessage('Export de l’image en cours…');
+
+    try {
+      await exportPlanAsImage();
+      showSizeMessage('Image exportée.');
+    } catch {
+      showSizeMessage('Échec de l’export image.');
+    } finally {
+      exportImageBtn.disabled = false;
+      refreshGrid();
+    }
+  });
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -430,7 +501,9 @@
 
   setupGridDragCleanup(gridContainer);
   initMarkerToggles();
-  initStaircaseSelect();
+  initEntranceToggles();
+  initLockToggles();
+  initStaircaseToggles();
   initPalette();
   initMapTabs();
   syncSizeInputsFromGrid();

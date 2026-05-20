@@ -38,6 +38,11 @@ function normalizeFloorName(name, fallback) {
   return trimmed || fallback;
 }
 
+function normalizeFloorGrid(grid) {
+  const { width, height } = normalizeGridDimensions(grid);
+  return cloneGridState({ ...grid, width, height, cells: grid.cells });
+}
+
 function cloneGridState(state) {
   return {
     width: state.width,
@@ -48,8 +53,12 @@ function cloneGridState(state) {
         if (typeof cell === 'string') return cell;
         return {
           presetId: cell.presetId,
-          markers: Array.isArray(cell.markers) ? [...cell.markers] : [],
-          staircase: cell.staircase ?? null,
+          markers: Array.isArray(cell.markers)
+            ? cell.markers.filter((id) => id !== 'key' && id !== 'entrance')
+            : [],
+          staircases: normalizeStaircases(cell),
+          lockedDoors: normalizeLockedDoors(cell),
+          entranceSide: cell.entranceSide ?? null,
         };
       })
     ),
@@ -57,7 +66,7 @@ function cloneGridState(state) {
 }
 
 function createEmptyFloor(name, index = 1) {
-  const grid = createGrid(10, 10);
+  const grid = createGrid(DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE);
   return {
     id: generateFloorId(),
     name: normalizeFloorName(name, defaultFloorName(index)),
@@ -78,8 +87,8 @@ function normalizeTabFromStorage(tab, index) {
       name: normalizeFloorName(floor.name, defaultFloorName(floorIndex + 1)),
       grid:
         floor.grid && floor.grid.cells
-          ? floor.grid
-          : cloneGridState(createGrid(10, 10)),
+          ? normalizeFloorGrid(floor.grid)
+          : cloneGridState(createGrid(DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE)),
     }));
     const activeExists = floors.some((f) => f.id === tab.activeFloorId);
     activeFloorId = activeExists ? tab.activeFloorId : floors[0].id;
@@ -87,7 +96,7 @@ function normalizeTabFromStorage(tab, index) {
     const floor = {
       id: generateFloorId(),
       name: 'RDC',
-      grid: tab.grid,
+      grid: normalizeFloorGrid(tab.grid),
     };
     floors = [floor];
     activeFloorId = floor.id;
