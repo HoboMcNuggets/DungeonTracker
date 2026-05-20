@@ -1,0 +1,88 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nevroze old school vrai gamer dungeon tracker</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="header">
+    <h1 class="header__title" title="Glissez une pièce sur la grille — cliquez sur une salle pour l'éditer">
+      <a href="https://twitch.tv/nevroze" class="header__title-link" target="_blank" rel="noopener noreferrer">Nevroze</a> old school vrai gamer dungeon tracker
+    </h1>
+
+    <form id="size-form" class="size-form" aria-label="Configuration de la grille">
+      <div class="size-form__field">
+        <label for="grid-width">Largeur</label>
+        <input type="number" id="grid-width" name="width" min="1" max="20" value="10" required>
+      </div>
+      <div class="size-form__field">
+        <label for="grid-height">Hauteur</label>
+        <input type="number" id="grid-height" name="height" min="1" max="20" value="10" required>
+      </div>
+      <button type="submit" class="btn btn--primary btn--compact">Appliquer</button>
+    </form>
+
+    <p id="size-message" class="size-message" role="status" aria-live="polite"></p>
+
+    <nav class="map-tabs-bar" aria-label="Onglets de cartes">
+      <div id="map-tabs-container" class="map-tabs"></div>
+    </nav>
+
+    <nav class="floor-tabs-bar" aria-label="Étages">
+      <div id="floor-tabs-container" class="floor-tabs"></div>
+    </nav>
+  </header>
+
+  <main class="main">
+    <section class="grid-section" aria-label="Grille du donjon">
+      <div class="grid-frame">
+        <div class="grid-frame__corner" aria-hidden="true"></div>
+        <div id="grid-col-labels" class="grid-frame__col-labels" aria-hidden="true"></div>
+        <div id="grid-row-labels" class="grid-frame__row-labels" aria-hidden="true"></div>
+        <div id="grid-container" class="grid-container" role="grid"></div>
+      </div>
+    </section>
+
+    <aside class="sidebar" aria-label="Pièces et édition">
+      <section id="pieces-panel" class="sidebar-view" aria-label="Palette de pièces">
+        <h2 class="sidebar__title">Pièces</h2>
+        <p class="sidebar__hint">Glissez-déposez une pièce sur la grille magnétique.</p>
+        <div id="palette-container"></div>
+      </section>
+
+      <section id="edit-panel" class="sidebar-view sidebar-view--hidden" aria-label="Édition de salle" aria-hidden="true">
+        <h2 class="sidebar__title">Éditer la salle</h2>
+        <p id="edit-hint" class="sidebar__hint sidebar__hint--compact"></p>
+        <div class="edit-markers">
+          <p class="sidebar__hint sidebar__hint--small">Indicateurs :</p>
+          <div class="marker-toggles" id="marker-toggles"></div>
+          <div class="staircase-field">
+            <label class="staircase-field__label">
+              <input type="checkbox" id="staircase-enabled">
+              Escalier
+            </label>
+            <select id="staircase-letter" class="staircase-field__select" disabled aria-label="Lettre de l'escalier"></select>
+          </div>
+        </div>
+        <div class="palette-actions palette-actions--top">
+          <button type="button" id="delete-cell-btn" class="btn btn--danger">
+            Supprimer la salle
+          </button>
+        </div>
+        <p class="sidebar__hint sidebar__hint--small">Changer le type :</p>
+        <div id="edit-preset-container"></div>
+      </section>
+    </aside>
+  </main>
+
+  <script src="js/roomPresets.js"></script>
+  <script src="js/cellMarkers.js"></script>
+  <script src="js/grid.js"></script>
+  <script src="js/mapTabs.js"></script>
+  <script src="js/dragDrop.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
