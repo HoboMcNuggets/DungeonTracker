@@ -118,7 +118,7 @@ function buildRoomElement(preset, cellData = null) {
 }
 
 function buildCellElement(x, y, cellData, options = {}) {
-  const { isActive = false, onDrop } = options;
+  const { isActive = false, onDrop, onMove } = options;
   const preset = cellData ? getPresetById(cellData.presetId) : null;
   const hasRoom = Boolean(preset);
 
@@ -142,8 +142,16 @@ function buildCellElement(x, y, cellData, options = {}) {
 
   cell.appendChild(buildRoomElement(preset, cellData));
 
-  if (onDrop) {
-    attachCellDropHandlers(cell, x, y, onDrop);
+  if (onDrop || onMove) {
+    attachCellDropHandlers(cell, x, y, {
+      hasRoom,
+      onPlacePreset: onDrop,
+      onMoveCell: onMove,
+    });
+  }
+
+  if (hasRoom && onMove) {
+    attachCellDrag(cell, x, y);
   }
 
   return cell;
@@ -284,8 +292,13 @@ function buildGridFrameElement(state, options = {}) {
 }
 
 function renderGrid(container, state, options = {}) {
-  const { activeCell = null, onDrop, colLabelsEl = null, rowLabelsEl = null } =
-    options;
+  const {
+    activeCell = null,
+    onDrop,
+    onMove,
+    colLabelsEl = null,
+    rowLabelsEl = null,
+  } = options;
   const useDedicatedRulers = Boolean(colLabelsEl && rowLabelsEl);
 
   container.replaceChildren();
@@ -307,6 +320,7 @@ function renderGrid(container, state, options = {}) {
       const cell = buildCellElement(x, y, cellData, {
         isActive,
         onDrop,
+        onMove,
       });
       container.appendChild(cell);
     }

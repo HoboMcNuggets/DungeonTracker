@@ -294,6 +294,36 @@ function toggleStaircase(x, y, letter) {
   return index < 0;
 }
 
+function moveCell(fromX, fromY, toX, toY) {
+  if (fromX === toX && fromY === toY) return false;
+  if (
+    fromY < 0 ||
+    fromY >= gridState.height ||
+    fromX < 0 ||
+    fromX >= gridState.width ||
+    toY < 0 ||
+    toY >= gridState.height ||
+    toX < 0 ||
+    toX >= gridState.width
+  ) {
+    return false;
+  }
+
+  const source = getCell(fromX, fromY);
+  if (!source) return false;
+  if (getCell(toX, toY)) return false;
+
+  gridState.cells[toY][toX] = {
+    presetId: source.presetId,
+    markers: [...source.markers],
+    staircases: [...source.staircases],
+    lockedDoors: { ...source.lockedDoors },
+    entranceSide: source.entranceSide,
+  };
+  gridState.cells[fromY][fromX] = null;
+  return true;
+}
+
 function setCell(x, y, presetId) {
   if (y < 0 || y >= gridState.height || x < 0 || x >= gridState.width) {
     return false;

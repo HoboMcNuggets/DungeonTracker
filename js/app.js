@@ -90,11 +90,11 @@
     refreshMapTabs();
   }
 
-  function handleTabDelete(tabId) {
+  async function handleTabDelete(tabId) {
     const tab = getTabById(tabId);
     if (!tab) return;
 
-    const confirmed = window.confirm(
+    const confirmed = await showConfirm(
       `Supprimer la carte « ${tab.name} » ? Tous ses étages seront perdus.`
     );
     if (!confirmed) return;
@@ -131,11 +131,11 @@
     refreshFloorTabs();
   }
 
-  function handleFloorDelete(floorId) {
+  async function handleFloorDelete(floorId) {
     const floor = getFloorById(floorId);
     if (!floor) return;
 
-    const confirmed = window.confirm(
+    const confirmed = await showConfirm(
       `Supprimer l'étage « ${floor.name} » ? Cette action est irréversible.`
     );
     if (!confirmed) return;
@@ -263,6 +263,24 @@
     syncMapTabFromGrid();
   }
 
+  function handleMove(fromX, fromY, toX, toY) {
+    if (!moveCell(fromX, fromY, toX, toY)) return;
+
+    const wasEditingMovedCell =
+      activeCell && activeCell.x === fromX && activeCell.y === fromY;
+
+    if (wasEditingMovedCell) {
+      activeCell = { x: toX, y: toY };
+    }
+
+    refreshGrid();
+    syncMapTabFromGrid();
+
+    if (wasEditingMovedCell) {
+      showEditView(toX, toY);
+    }
+  }
+
   function handleEditPresetSelect(presetId) {
     if (!activeCell) return;
 
@@ -346,6 +364,7 @@
     renderGrid(gridContainer, state, {
       activeCell,
       onDrop: handleDrop,
+      onMove: handleMove,
     });
   }
 
@@ -440,7 +459,7 @@
   }
 
   gridContainer.addEventListener('click', (event) => {
-    if (isDragActive()) return;
+    if (isDragActive() || wasDragJustCompleted()) return;
     const cell = event.target.closest('.grid-cell--filled');
     if (!cell || !gridContainer.contains(cell)) return;
     event.stopPropagation();
