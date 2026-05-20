@@ -17,10 +17,10 @@ function formatCellLabel(x, y, preset, cellData) {
       .map((id) => getMarkerById(id)?.label)
       .filter(Boolean);
     if (markerLabels.length) {
-      label += ` � ${markerLabels.join(', ')}`;
+      label += ` — ${markerLabels.join(', ')}`;
     }
     if (cellData.entranceSide) {
-      label += ` � entr�e ${DOOR_SIDE_ARROWS[cellData.entranceSide]}`;
+      label += ` — entrée ${DOOR_SIDE_ARROWS[cellData.entranceSide]}`;
     }
     if (preset) {
       const locked = EDGES.filter(
@@ -28,11 +28,11 @@ function formatCellLabel(x, y, preset, cellData) {
       ).map((side) => DOOR_SIDE_ARROWS[side]);
       if (locked.length) {
         const plural = locked.length > 1;
-        label += ` � porte${plural ? 's' : ''} verrouill�e${plural ? 's' : ''} ${locked.join(', ')}`;
+        label += ` — porte${plural ? 's' : ''} verrouillée${plural ? 's' : ''} ${locked.join(', ')}`;
       }
     }
     if (cellData.staircases.length) {
-      label += ` � escaliers ${cellData.staircases.join(', ')}`;
+      label += ` — escaliers ${cellData.staircases.join(', ')}`;
     }
   }
 

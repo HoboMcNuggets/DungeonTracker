@@ -511,6 +511,10 @@ body {
   max-width: none;
 }
 
+.floors-view--all {
+  position: relative;
+}
+
 .floor-block {
   display: flex;
   flex-direction: column;
@@ -615,6 +619,10 @@ body {
   pointer-events: none;
   z-index: 2;
   overflow: visible;
+}
+
+.staircase-links-overlay--global {
+  z-index: 10;
 }
 
 .staircase-links-overlay line {

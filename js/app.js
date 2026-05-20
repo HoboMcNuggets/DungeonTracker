@@ -48,10 +48,26 @@
   }
 
   function getStaircaseLinksOverlay() {
+    if (showAllFloors) {
+      return floorsView.querySelector('.staircase-links-overlay--global');
+    }
     return (
       floorsView.querySelector('.floor-block--active .staircase-links-overlay') ??
       floorsView.querySelector('#staircase-links-overlay')
     );
+  }
+
+  function ensureGlobalStaircaseLinksOverlay() {
+    let overlay = floorsView.querySelector('.staircase-links-overlay--global');
+    if (!overlay) {
+      overlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      overlay.classList.add(
+        'staircase-links-overlay',
+        'staircase-links-overlay--global'
+      );
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+    return overlay;
   }
 
   function getFloorIdFromGridContainer(gridContainer) {
@@ -234,7 +250,7 @@
     if (!tab) return;
 
     const confirmed = await showConfirm(
-      `Supprimer la carte Â« ${tab.name} Â» ? Tous ses Ã©tages seront perdus.`
+      `Supprimer la carte « ${tab.name} » ? Tous ses étages seront perdus.`
     );
     if (!confirmed) return;
 
@@ -277,7 +293,7 @@
     if (!floor) return;
 
     const confirmed = await showConfirm(
-      `Supprimer l'Ã©tage Â« ${floor.name} Â» ? Cette action est irrÃ©versible.`
+      `Supprimer l'étage « ${floor.name} » ? Cette action est irréversible.`
     );
     if (!confirmed) return;
 
@@ -302,7 +318,7 @@
       const clamped = Math.min(MAX_SIZE, Math.max(MIN_SIZE, value));
       input.value = String(clamped);
       showSizeMessage(
-        `Valeur ajustÃ©e entre ${MIN_SIZE} et ${MAX_SIZE}.`,
+        `Valeur ajustée entre ${MIN_SIZE} et ${MAX_SIZE}.`,
         true
       );
       return clamped;
@@ -377,7 +393,7 @@
     const cell = getCell(x, y);
     const preset = cell ? getPresetById(cell.presetId) : null;
     editHint.textContent = preset
-      ? `Case ${formatCellCoord(x, y)} â€” ${preset.label}`
+      ? `Case ${formatCellCoord(x, y)} — ${preset.label}`
       : `Case ${formatCellCoord(x, y)}`;
 
     renderSectionedPalette(editPresetContainer, getPresetSections(), {
@@ -490,7 +506,7 @@
 
     const preset = getPresetById(presetId);
     editHint.textContent = preset
-      ? `Case ${formatCellCoord(activeCell.x, activeCell.y)} â€” ${preset.label}`
+      ? `Case ${formatCellCoord(activeCell.x, activeCell.y)} — ${preset.label}`
       : editHint.textContent;
     updateEditToggles();
     syncMapTabFromGrid();
@@ -571,47 +587,47 @@
     }
   }
 
-  function getCellCenterInContainer(x, y) {
-    const gridContainer = getActiveGridContainer();
+  function getCellCenterRelativeTo(rootEl, floorId, x, y) {
+    const gridContainer = floorsView.querySelector(
+      `.grid-container--editable[data-floor-id="${floorId}"]`
+    );
     if (!gridContainer) return null;
     const cellEl = getCellElement(gridContainer, x, y);
     if (!cellEl) return null;
 
-    const containerRect = gridContainer.getBoundingClientRect();
+    const rootRect = rootEl.getBoundingClientRect();
     const cellRect = cellEl.getBoundingClientRect();
     return {
-      x: cellRect.left - containerRect.left + cellRect.width / 2,
-      y: cellRect.top - containerRect.top + cellRect.height / 2,
+      x: cellRect.left - rootRect.left + cellRect.width / 2,
+      y: cellRect.top - rootRect.top + cellRect.height / 2,
     };
   }
 
-  function updateStaircaseLinksOverlay(letter) {
-    const staircaseLinksOverlay = getStaircaseLinksOverlay();
-    if (!staircaseLinksOverlay) return;
-
-    const gridContainer = getActiveGridContainer();
-    if (!gridContainer) return;
-
-    const positions = findStaircasePositionsInGrid(getGridState(), letter);
-    if (positions.length < 2) {
-      staircaseLinksOverlay.replaceChildren();
-      return;
+  function getAllStaircasePositionsForLetter(letter) {
+    const normalized = String(letter).toUpperCase();
+    const positions = [];
+    for (const floor of getFloors()) {
+      const grid =
+        floor.id === getActiveFloorId() ? getGridState() : floor.grid;
+      for (const { x, y } of findStaircasePositionsInGrid(grid, normalized)) {
+        positions.push({ floorId: floor.id, x, y });
+      }
     }
+    return positions;
+  }
 
-    const centers = positions
-      .map(({ x, y }) => getCellCenterInContainer(x, y))
-      .filter(Boolean);
+  function drawStaircaseLinkLines(overlay, rootEl, centers) {
     if (centers.length < 2) {
-      staircaseLinksOverlay.replaceChildren();
+      overlay.replaceChildren();
       return;
     }
 
-    const containerRect = gridContainer.getBoundingClientRect();
-    staircaseLinksOverlay.setAttribute(
+    const rootRect = rootEl.getBoundingClientRect();
+    overlay.setAttribute(
       'viewBox',
-      `0 0 ${containerRect.width} ${containerRect.height}`
+      `0 0 ${rootRect.width} ${rootRect.height}`
     );
-    staircaseLinksOverlay.replaceChildren();
+    overlay.replaceChildren();
 
     for (let i = 0; i < centers.length; i++) {
       for (let j = i + 1; j < centers.length; j++) {
@@ -623,9 +639,49 @@
         line.setAttribute('y1', String(centers[i].y));
         line.setAttribute('x2', String(centers[j].x));
         line.setAttribute('y2', String(centers[j].y));
-        staircaseLinksOverlay.appendChild(line);
+        overlay.appendChild(line);
       }
     }
+  }
+
+  function updateStaircaseLinksOverlay(letter) {
+    const staircaseLinksOverlay = getStaircaseLinksOverlay();
+    if (!staircaseLinksOverlay) return;
+
+    const normalized = String(letter).toUpperCase();
+
+    if (showAllFloors) {
+      const positions = getAllStaircasePositionsForLetter(normalized);
+      if (positions.length < 2) {
+        staircaseLinksOverlay.replaceChildren();
+        return;
+      }
+
+      const centers = positions
+        .map(({ floorId, x, y }) =>
+          getCellCenterRelativeTo(floorsView, floorId, x, y)
+        )
+        .filter(Boolean);
+      drawStaircaseLinkLines(staircaseLinksOverlay, floorsView, centers);
+      return;
+    }
+
+    const gridContainer = getActiveGridContainer();
+    if (!gridContainer) return;
+
+    const activeFloorId = getActiveFloorId();
+    const positions = findStaircasePositionsInGrid(getGridState(), normalized);
+    if (positions.length < 2) {
+      staircaseLinksOverlay.replaceChildren();
+      return;
+    }
+
+    const centers = positions
+      .map(({ x, y }) =>
+        getCellCenterRelativeTo(gridContainer, activeFloorId, x, y)
+      )
+      .filter(Boolean);
+    drawStaircaseLinkLines(staircaseLinksOverlay, gridContainer, centers);
   }
 
   function handleStaircaseHover(letter) {
@@ -707,6 +763,10 @@
       floorsView.appendChild(block);
     }
 
+    if (showAllFloors) {
+      floorsView.appendChild(ensureGlobalStaircaseLinksOverlay());
+    }
+
     requestAnimationFrame(refreshMapZoomLayout);
   }
 
@@ -740,7 +800,7 @@
       btn.setAttribute('aria-pressed', 'false');
       btn.setAttribute(
         'aria-label',
-        `EntrÃ©e cÃ´tÃ© ${DOOR_SIDE_NAMES[side]}`
+        `Entrée côté ${DOOR_SIDE_NAMES[side]}`
       );
       btn.addEventListener('click', () => handleEntranceToggle(side));
       entranceButtons[side] = btn;
@@ -885,13 +945,6 @@
       return;
     }
 
-    if (showAllFloors && getFloorIdFromGridContainer(gridContainer) !== getActiveFloorId()) {
-      if (hoveredStaircaseLetter) {
-        clearStaircaseLinksOverlay();
-      }
-      return;
-    }
-
     const staircaseBadge = findStaircaseBadgeFromEvent(event, gridContainer);
     if (staircaseBadge) {
       handleStaircaseHover(staircaseBadge.dataset.staircaseLetter);
@@ -903,8 +956,7 @@
   });
 
   floorsView.addEventListener('mouseleave', (event) => {
-    const gridContainer = getActiveGridContainer();
-    if (gridContainer && gridContainer.contains(event.relatedTarget)) return;
+    if (floorsView.contains(event.relatedTarget)) return;
     clearStaircaseLinksOverlay();
   });
 
@@ -958,13 +1010,13 @@
   exportImageBtn.addEventListener('click', async () => {
     syncMapTabFromGrid();
     exportImageBtn.disabled = true;
-    showSizeMessage('Export de lâ€™image en coursâ€¦');
+    showSizeMessage("Export de l'image en cours…");
 
     try {
       await exportPlanAsImage();
-      showSizeMessage('Image exportÃ©e.');
+      showSizeMessage('Image exportée.');
     } catch {
-      showSizeMessage('Ã‰chec de lâ€™export image.');
+      showSizeMessage("Échec de l'export image.");
     } finally {
       exportImageBtn.disabled = false;
       refreshGrid();
