@@ -10,6 +10,7 @@ const DOOR_NEIGHBOR_OFFSET = { n: { x: 0, y: -1 }, e: { x: 1, y: 0 }, s: { x: 0,
 const REMOVED_MARKER_IDS = new Set(['key', 'entrance']);
 
 const EMPTY_LOCKED_DOORS = { n: false, e: false, s: false, w: false };
+const EMPTY_BREAKABLE_WALLS = { n: false, e: false, s: false, w: false };
 
 let gridState = createGrid(DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE);
 
@@ -19,6 +20,7 @@ function createEmptyCellData(presetId) {
     markers: [],
     staircases: [],
     lockedDoors: { ...EMPTY_LOCKED_DOORS },
+    breakableWalls: { ...EMPTY_BREAKABLE_WALLS },
     entranceSide: null,
   };
 }
@@ -61,6 +63,21 @@ function normalizeLockedDoors(cell) {
   return locked;
 }
 
+function normalizeBreakableWalls(cell) {
+  const preset = getPresetById(cell.presetId);
+  const raw =
+    cell.breakableWalls && typeof cell.breakableWalls === 'object'
+      ? cell.breakableWalls
+      : EMPTY_BREAKABLE_WALLS;
+  const breakable = { ...EMPTY_BREAKABLE_WALLS };
+
+  for (const side of DOOR_SIDES) {
+    breakable[side] = Boolean(raw[side]) && Boolean(preset);
+  }
+
+  return breakable;
+}
+
 function normalizeStaircases(cell) {
   if (Array.isArray(cell.staircases)) {
     const seen = new Set();
@@ -96,11 +113,13 @@ function normalizeCell(cell) {
     markers: sanitizeMarkers(cell.markers),
     staircases: normalizeStaircases(cell),
     lockedDoors: normalizeLockedDoors(cell),
+    breakableWalls: normalizeBreakableWalls(cell),
     entranceSide,
   };
 
   if (entranceSide) {
     normalized.lockedDoors[entranceSide] = false;
+    normalized.breakableWalls[entranceSide] = false;
   }
 
   return normalized;
@@ -265,6 +284,9 @@ function syncLinkedDoorLock(sourceX, sourceY, side, locked, updatedCoords) {
   if (neighborCell.entranceSide === oppositeSide) return;
 
   neighborCell.lockedDoors[oppositeSide] = locked;
+  if (locked) {
+    neighborCell.breakableWalls[oppositeSide] = false;
+  }
   gridState.cells[ny][nx] = neighborCell;
   updatedCoords.push({ x: nx, y: ny });
 }
@@ -284,11 +306,60 @@ function toggleLockedDoor(x, y, side) {
   }
 
   cell.lockedDoors[side] = !cell.lockedDoors[side];
+  if (cell.lockedDoors[side]) {
+    cell.breakableWalls[side] = false;
+  }
   gridState.cells[y][x] = cell;
 
   const coords = [{ x, y }];
   syncLinkedDoorLock(x, y, side, cell.lockedDoors[side], coords);
   return { locked: cell.lockedDoors[side], coords };
+}
+
+function syncLinkedBreakableWall(sourceX, sourceY, side, breakable, updatedCoords) {
+  const neighborCoords = getDoorNeighborCoords(sourceX, sourceY, side);
+  if (!neighborCoords) return;
+
+  const { x: nx, y: ny } = neighborCoords;
+  const neighborCell = getCell(nx, ny);
+  if (!neighborCell) return;
+
+  const oppositeSide = OPPOSITE_DOOR_SIDE[side];
+  const neighborPreset = getPresetById(neighborCell.presetId);
+  if (!neighborPreset) return;
+  if (neighborCell.entranceSide === oppositeSide) return;
+
+  neighborCell.breakableWalls[oppositeSide] = breakable;
+  if (breakable) {
+    neighborCell.lockedDoors[oppositeSide] = false;
+  }
+  gridState.cells[ny][nx] = neighborCell;
+  updatedCoords.push({ x: nx, y: ny });
+}
+
+function toggleBreakableWall(x, y, side) {
+  const cell = getCell(x, y);
+  if (!cell || !DOOR_SIDES.includes(side)) {
+    return { breakable: false, coords: [] };
+  }
+
+  const preset = getPresetById(cell.presetId);
+  if (!preset) {
+    return { breakable: false, coords: [] };
+  }
+  if (cell.entranceSide === side) {
+    return { breakable: false, coords: [] };
+  }
+
+  cell.breakableWalls[side] = !cell.breakableWalls[side];
+  if (cell.breakableWalls[side]) {
+    cell.lockedDoors[side] = false;
+  }
+  gridState.cells[y][x] = cell;
+
+  const coords = [{ x, y }];
+  syncLinkedBreakableWall(x, y, side, cell.breakableWalls[side], coords);
+  return { breakable: cell.breakableWalls[side], coords };
 }
 
 function toggleEntranceDoor(x, y, side) {
@@ -306,6 +377,7 @@ function toggleEntranceDoor(x, y, side) {
 
   cell.entranceSide = side;
   cell.lockedDoors[side] = false;
+  cell.breakableWalls[side] = false;
   gridState.cells[y][x] = cell;
   return true;
 }
@@ -353,6 +425,7 @@ function moveCell(fromX, fromY, toX, toY) {
     markers: [...source.markers],
     staircases: [...source.staircases],
     lockedDoors: { ...source.lockedDoors },
+    breakableWalls: { ...source.breakableWalls },
     entranceSide: source.entranceSide,
   };
   gridState.cells[fromY][fromX] = null;
@@ -379,6 +452,12 @@ function setCell(x, y, presetId) {
   const lockedDoors = existing
     ? normalizeLockedDoors({ presetId: preset.id, lockedDoors: existing.lockedDoors })
     : { ...EMPTY_LOCKED_DOORS };
+  const breakableWalls = existing
+    ? normalizeBreakableWalls({
+        presetId: preset.id,
+        breakableWalls: existing.breakableWalls,
+      })
+    : { ...EMPTY_BREAKABLE_WALLS };
 
   let entranceSide = existing?.entranceSide ?? null;
   if (entranceSide && !preset.doors[entranceSide]) {
@@ -393,6 +472,7 @@ function setCell(x, y, presetId) {
     markers: existing ? [...existing.markers] : [],
     staircases: existing ? [...existing.staircases] : [],
     lockedDoors,
+    breakableWalls,
     entranceSide,
   };
   return true;

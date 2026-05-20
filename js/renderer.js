@@ -30,6 +30,13 @@ function formatCellLabel(x, y, preset, cellData) {
         const plural = locked.length > 1;
         label += ` — porte${plural ? 's' : ''} verrouillée${plural ? 's' : ''} ${locked.join(', ')}`;
       }
+      const breakable = EDGES.filter(
+        (side) => cellData.breakableWalls[side]
+      ).map((side) => DOOR_SIDE_ARROWS[side]);
+      if (breakable.length) {
+        const plural = breakable.length > 1;
+        label += ` — porte${plural ? 's' : ''} brisable${plural ? 's' : ''} ${breakable.join(', ')}`;
+      }
     }
     if (cellData.staircases.length) {
       label += ` — escaliers ${cellData.staircases.join(', ')}`;
@@ -95,8 +102,12 @@ function buildRoomElement(preset, cellData = null) {
     const isLocked = Boolean(
       hasDoor && cellData?.lockedDoors?.[side] && !isEntranceDoor
     );
+    const isBreakable = Boolean(
+      cellData?.breakableWalls?.[side] && !isEntranceDoor
+    );
+    const showAsDoor = hasDoor || isBreakable;
     edge.classList.add('room__edge', `room__edge--${side}`);
-    edge.classList.add(hasDoor ? 'room__edge--door' : 'room__edge--wall');
+    edge.classList.add(showAsDoor ? 'room__edge--door' : 'room__edge--wall');
     if (isEntranceDoor) {
       edge.classList.add('room__edge--entrance');
     }
@@ -106,6 +117,13 @@ function buildRoomElement(preset, cellData = null) {
       lock.className = 'room__edge__lock';
       lock.setAttribute('aria-hidden', 'true');
       edge.appendChild(lock);
+    }
+    if (isBreakable) {
+      edge.classList.add('room__edge--breakable');
+      const bomb = document.createElement('span');
+      bomb.className = 'room__edge__bomb';
+      bomb.setAttribute('aria-hidden', 'true');
+      edge.appendChild(bomb);
     }
     room.appendChild(edge);
   }
@@ -520,6 +538,7 @@ function startSegmentRename(labelEl, itemId, currentName, onRename, options = {}
 }
 
 const TAB_REORDER_MIME = 'application/x-dungeon-tab-reorder';
+const TAB_CLICK_DELAY_MS = 250;
 
 let tabReorderDragId = null;
 let lastTabReorderEndedAt = 0;
@@ -617,14 +636,28 @@ function renderSegmentTabs(container, items, activeId, options = {}) {
     const label = document.createElement('span');
     label.className = `${classPrefix}__label`;
     label.textContent = item.name;
-    label.addEventListener('dblclick', (event) => {
+    tabBtn.appendChild(label);
+
+    let clickTimer = null;
+
+    const clearClickTimer = () => {
+      clearTimeout(clickTimer);
+      clickTimer = null;
+    };
+
+    const beginRename = (event) => {
+      if (event.target.closest(`.${classPrefix}__close`)) return;
+      event.preventDefault();
       event.stopPropagation();
+      clearClickTimer();
+      if (label.querySelector(`.${classPrefix}__rename-input`)) return;
       startSegmentRename(label, item.id, item.name, onRename, {
         classPrefix,
         renameAriaLabel,
       });
-    });
-    tabBtn.appendChild(label);
+    };
+
+    tabBtn.addEventListener('dblclick', beginRename);
 
     if (canDelete) {
       const closeBtn = document.createElement('button');
@@ -642,11 +675,17 @@ function renderSegmentTabs(container, items, activeId, options = {}) {
 
     if (canReorder) {
       attachTabReorder(tabBtn, item.id, classPrefix, items, onReorder);
+      tabBtn.addEventListener('dragstart', clearClickTimer);
     }
 
-    tabBtn.addEventListener('click', () => {
+    tabBtn.addEventListener('click', (event) => {
+      if (event.target.closest(`.${classPrefix}__close`)) return;
       if (wasTabReorderJustCompleted()) return;
-      onSelect(item.id);
+      clearClickTimer();
+      clickTimer = setTimeout(() => {
+        clickTimer = null;
+        onSelect(item.id);
+      }, TAB_CLICK_DELAY_MS);
     });
 
     container.appendChild(tabBtn);

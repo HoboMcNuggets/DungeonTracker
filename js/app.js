@@ -16,6 +16,7 @@
   const staircaseToggles = document.getElementById('staircase-toggles');
   const entranceToggles = document.getElementById('entrance-toggles');
   const lockToggles = document.getElementById('lock-toggles');
+  const breakableWallToggles = document.getElementById('breakable-wall-toggles');
   const deleteCellBtn = document.getElementById('delete-cell-btn');
   const mapTabsContainer = document.getElementById('map-tabs-container');
   const floorTabsContainer = document.getElementById('floor-tabs-container');
@@ -32,6 +33,7 @@
   const staircaseButtons = {};
   const entranceButtons = {};
   const lockButtons = {};
+  const breakableWallButtons = {};
 
   function getGridContainerFromTarget(target) {
     return target?.closest?.('.grid-container--editable') ?? null;
@@ -102,6 +104,7 @@
       markers: [...cell.markers],
       staircases: [...cell.staircases],
       lockedDoors: { ...cell.lockedDoors },
+      breakableWalls: { ...cell.breakableWalls },
       entranceSide: cell.entranceSide,
     };
   }
@@ -221,6 +224,7 @@
   }
 
   function handleTabSelect(tabId) {
+    if (getActiveTabId() === tabId && showAllFloors) return;
     if (getActiveTabId() !== tabId && !switchToTab(tabId)) return;
     showAllFloors = true;
     activeCell = null;
@@ -264,6 +268,7 @@
   }
 
   function handleFloorSelect(floorId) {
+    if (getActiveFloorId() === floorId && !showAllFloors) return;
     if (getActiveFloorId() !== floorId && !switchToFloor(floorId)) return;
     showAllFloors = false;
     activeCell = null;
@@ -381,6 +386,14 @@
       const locked = hasDoor && cell.lockedDoors[side];
       lockBtn.classList.toggle('btn--lock-active', locked);
       lockBtn.setAttribute('aria-pressed', locked ? 'true' : 'false');
+
+      const breakableBtn = breakableWallButtons[side];
+      if (!breakableBtn) continue;
+      breakableBtn.hidden = false;
+      breakableBtn.disabled = isEntrance;
+      const breakable = cell.breakableWalls[side];
+      breakableBtn.classList.toggle('btn--breakable-wall-active', breakable);
+      breakableBtn.setAttribute('aria-pressed', breakable ? 'true' : 'false');
     }
   }
 
@@ -545,6 +558,17 @@
     if (!activeCell) return;
 
     const { coords } = toggleLockedDoor(activeCell.x, activeCell.y, side);
+    for (const { x, y } of coords) {
+      syncCell(x, y);
+    }
+    updateEditToggles();
+    syncMapTabFromGrid();
+  }
+
+  function handleBreakableWallToggle(side) {
+    if (!activeCell) return;
+
+    const { coords } = toggleBreakableWall(activeCell.x, activeCell.y, side);
     for (const { x, y } of coords) {
       syncCell(x, y);
     }
@@ -830,6 +854,28 @@
     }
   }
 
+  function initBreakableWallToggles() {
+    breakableWallToggles.replaceChildren();
+
+    for (const side of DOOR_SIDES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--breakable-wall';
+      btn.textContent = DOOR_SIDE_ARROWS[side];
+      btn.dataset.side = side;
+      btn.hidden = true;
+      btn.disabled = true;
+      btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute(
+        'aria-label',
+        `Porte brisable côté ${DOOR_SIDE_NAMES[side]} (bombe)`
+      );
+      btn.addEventListener('click', () => handleBreakableWallToggle(side));
+      breakableWallButtons[side] = btn;
+      breakableWallToggles.appendChild(btn);
+    }
+  }
+
   function initStaircaseToggles() {
     staircaseToggles.replaceChildren();
 
@@ -1051,6 +1097,7 @@
   initMarkerToggles();
   initEntranceToggles();
   initLockToggles();
+  initBreakableWallToggles();
   initStaircaseToggles();
   initPalette();
   initMapTabs();

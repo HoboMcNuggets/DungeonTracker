@@ -58,6 +58,7 @@ function cloneGridState(state) {
             : [],
           staircases: normalizeStaircases(cell),
           lockedDoors: normalizeLockedDoors(cell),
+          breakableWalls: normalizeBreakableWalls(cell),
           entranceSide: cell.entranceSide ?? null,
         };
       })

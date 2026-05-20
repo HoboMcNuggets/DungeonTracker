@@ -25,6 +25,9 @@
   --color-staircase-link-shadow: #0e0c1a;
   --color-door-locked: #8b4545;
   --color-door-locked-shadow: #5c2a2a;
+  --color-wall-breakable: #c87830;
+  --color-wall-breakable-shadow: #8a4a18;
+  --color-wall-breakable-glow: #e8a050;
   --color-border: #4a4a68;
   --cell-size-max: 56px;
   --cell-size: var(--cell-size-max);
@@ -963,6 +966,13 @@ body {
     0 0 0 1px var(--color-wall-dark);
 }
 
+.room__edge--door.room__edge--breakable {
+  background: var(--color-wall-breakable);
+  box-shadow:
+    inset 0 0 0 1px var(--color-wall-breakable-shadow),
+    0 0 0 1px var(--color-wall-dark);
+}
+
 .room__edge__lock {
   position: absolute;
   left: 50%;
@@ -988,6 +998,32 @@ body {
   border-bottom: none;
   border-radius: 3px 3px 0 0;
   background: transparent;
+}
+
+.room__edge__bomb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1.5px solid #1a1028;
+  border-radius: 50%;
+  background: #2a2a2a;
+  pointer-events: none;
+}
+
+.room__edge__bomb::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -0.22rem;
+  transform: translateX(-50%);
+  width: 0.08rem;
+  height: 0.2rem;
+  background: #e8a050;
+  border-radius: 1px;
+  box-shadow: 0 -0.08rem 0.12rem var(--color-wall-breakable-glow);
 }
 
 .export-host {
@@ -1017,6 +1053,9 @@ body {
   --color-marker-stair: #8a5a30;
   --color-door-locked: #8b4545;
   --color-door-locked-shadow: #5c2a2a;
+  --color-wall-breakable: #c87830;
+  --color-wall-breakable-shadow: #8a4a18;
+  --color-wall-breakable-glow: #e8a050;
   --color-border: #4a4a68;
   --cell-size-max: 56px;
   --grid-gap: 2px;
@@ -1214,6 +1253,7 @@ body {
 
 .entrance-field,
 .lock-field,
+.breakable-wall-field,
 .staircase-field {
   margin-bottom: 0.5rem;
 }
@@ -1231,7 +1271,8 @@ body {
 }
 
 .btn--entrance-side,
-.btn--lock {
+.btn--lock,
+.btn--breakable-wall {
   padding: 0.28rem 0;
   font-size: 1rem;
   line-height: 1;
@@ -1245,12 +1286,14 @@ body {
 }
 
 .btn--entrance-side:hover:not(:disabled),
-.btn--lock:hover:not(:disabled) {
+.btn--lock:hover:not(:disabled),
+.btn--breakable-wall:hover:not(:disabled) {
   background: #2e2e44;
 }
 
 .btn--entrance-side:disabled,
-.btn--lock:disabled {
+.btn--lock:disabled,
+.btn--breakable-wall:disabled {
   opacity: 0.25;
 }
 
@@ -1266,8 +1309,15 @@ body {
   color: #f0d8d8;
 }
 
+.btn--breakable-wall-active {
+  border-color: var(--color-wall-breakable);
+  background: rgba(200, 120, 48, 0.35);
+  color: var(--color-wall-breakable-glow);
+}
+
 .btn--entrance-side[hidden],
-.btn--lock[hidden] {
+.btn--lock[hidden],
+.btn--breakable-wall[hidden] {
   display: none;
 }
 
