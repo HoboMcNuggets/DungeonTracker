@@ -44,7 +44,10 @@
         <div class="grid-frame__corner" aria-hidden="true"></div>
         <div id="grid-col-labels" class="grid-frame__col-labels" aria-hidden="true"></div>
         <div id="grid-row-labels" class="grid-frame__row-labels" aria-hidden="true"></div>
-        <div id="grid-container" class="grid-container" role="grid"></div>
+        <div class="grid-container-wrap">
+          <div id="grid-container" class="grid-container" role="grid"></div>
+          <svg id="staircase-links-overlay" class="staircase-links-overlay" aria-hidden="true"></svg>
+        </div>
       </div>
     </section>
 
@@ -61,7 +64,7 @@
         <h2 class="sidebar__title">Éditer la salle</h2>
         <p id="edit-hint" class="sidebar__hint sidebar__hint--compact"></p>
         <div class="edit-markers">
-          <p class="sidebar__hint sidebar__hint--small">Coffre :</p>
+          <p class="sidebar__hint sidebar__hint--small">Marqueurs :</p>
           <div class="marker-toggles" id="marker-toggles"></div>
           <div class="lock-field">
             <p class="sidebar__hint sidebar__hint--small">Portes verrouillées :</p>
@@ -99,6 +102,7 @@
   <script src="js/cellMarkers.js"></script>
   <script src="js/grid.js"></script>
   <script src="js/mapTabs.js"></script>
+  <script src="js/staircases.js"></script>
   <script src="js/dragDrop.js"></script>
   <script src="js/renderer.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>

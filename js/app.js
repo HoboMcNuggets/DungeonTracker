@@ -7,6 +7,7 @@
   const heightInput = document.getElementById('grid-height');
   const sizeMessage = document.getElementById('size-message');
   const gridContainer = document.getElementById('grid-container');
+  const staircaseLinksOverlay = document.getElementById('staircase-links-overlay');
   const piecesPanel = document.getElementById('pieces-panel');
   const paletteContainer = document.getElementById('palette-container');
   const editPanel = document.getElementById('edit-panel');
@@ -22,6 +23,7 @@
   const exportImageBtn = document.getElementById('export-image-btn');
 
   let activeCell = null;
+  let hoveredStaircaseLetter = null;
   const markerButtons = {};
   const staircaseButtons = {};
   const entranceButtons = {};
@@ -317,17 +319,21 @@
   function handleStaircaseToggle(letter) {
     if (!activeCell) return;
 
-    toggleStaircase(activeCell.x, activeCell.y, letter);
-    syncCell(activeCell.x, activeCell.y);
-    updateEditToggles();
+    const { x, y } = activeCell;
+    toggleStaircase(x, y, letter);
     syncMapTabFromGrid();
+    refreshGrid();
+    showEditView(x, y);
+    updateEditToggles();
   }
 
   function handleLockToggle(side) {
     if (!activeCell) return;
 
-    toggleLockedDoor(activeCell.x, activeCell.y, side);
-    syncCell(activeCell.x, activeCell.y);
+    const { coords } = toggleLockedDoor(activeCell.x, activeCell.y, side);
+    for (const { x, y } of coords) {
+      syncCell(x, y);
+    }
     updateEditToggles();
     syncMapTabFromGrid();
   }
@@ -359,7 +365,91 @@
     syncMapTabFromGrid();
   }
 
+  function clearStaircaseLinksOverlay() {
+    hoveredStaircaseLetter = null;
+    if (staircaseLinksOverlay) {
+      staircaseLinksOverlay.replaceChildren();
+    }
+  }
+
+  function getCellCenterInContainer(x, y) {
+    const cellEl = getCellElement(gridContainer, x, y);
+    if (!cellEl) return null;
+
+    const containerRect = gridContainer.getBoundingClientRect();
+    const cellRect = cellEl.getBoundingClientRect();
+    return {
+      x: cellRect.left - containerRect.left + cellRect.width / 2,
+      y: cellRect.top - containerRect.top + cellRect.height / 2,
+    };
+  }
+
+  function updateStaircaseLinksOverlay(letter) {
+    if (!staircaseLinksOverlay) return;
+
+    const positions = findStaircasePositionsInGrid(getGridState(), letter);
+    if (positions.length < 2) {
+      staircaseLinksOverlay.replaceChildren();
+      return;
+    }
+
+    const centers = positions
+      .map(({ x, y }) => getCellCenterInContainer(x, y))
+      .filter(Boolean);
+    if (centers.length < 2) {
+      staircaseLinksOverlay.replaceChildren();
+      return;
+    }
+
+    const containerRect = gridContainer.getBoundingClientRect();
+    staircaseLinksOverlay.setAttribute(
+      'viewBox',
+      `0 0 ${containerRect.width} ${containerRect.height}`
+    );
+    staircaseLinksOverlay.replaceChildren();
+
+    for (let i = 0; i < centers.length; i++) {
+      for (let j = i + 1; j < centers.length; j++) {
+        const line = document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'line'
+        );
+        line.setAttribute('x1', String(centers[i].x));
+        line.setAttribute('y1', String(centers[i].y));
+        line.setAttribute('x2', String(centers[j].x));
+        line.setAttribute('y2', String(centers[j].y));
+        staircaseLinksOverlay.appendChild(line);
+      }
+    }
+  }
+
+  function handleStaircaseHover(letter) {
+    const normalized = String(letter).toUpperCase();
+    if (hoveredStaircaseLetter === normalized) return;
+    hoveredStaircaseLetter = normalized;
+    updateStaircaseLinksOverlay(normalized);
+  }
+
+  function handleStaircaseNavigate(letter) {
+    syncMapTabFromGrid();
+    const targetFloorId = resolveTargetFloorIdForStaircase(
+      letter,
+      getActiveFloorId()
+    );
+    if (!targetFloorId) return;
+
+    clearStaircaseLinksOverlay();
+    if (!switchToFloor(targetFloorId)) return;
+
+    activeCell = null;
+    syncSizeInputsFromGrid();
+    showPiecesView();
+    refreshGrid();
+    refreshFloorTabs();
+  }
+
   function refreshGrid() {
+    clearStaircaseLinksOverlay();
     const state = getGridState();
     renderGrid(gridContainer, state, {
       activeCell,
@@ -458,8 +548,66 @@
     showPiecesView();
   }
 
+  function findStaircaseBadgeFromEvent(event) {
+    if (event.target.closest?.('.room__marker--staircase')) {
+      return event.target.closest('.room__marker--staircase');
+    }
+    const cell = event.target.closest('.grid-cell--filled');
+    if (!cell || !gridContainer.contains(cell)) return null;
+    const x = parseInt(cell.dataset.x, 10);
+    const y = parseInt(cell.dataset.y, 10);
+    const cellData = getCell(x, y);
+    if (!cellData?.staircases.length) return null;
+
+    const markers = cell.querySelector('.room__markers');
+    if (!markers) return null;
+
+    const badges = markers.querySelectorAll('.room__marker--staircase');
+    if (!badges.length) return null;
+
+    const pointerX = event.clientX;
+    const pointerY = event.clientY;
+    const hitPad = 4;
+
+    let hitBadge = null;
+    let hitDist = Infinity;
+    for (const badge of badges) {
+      const rect = badge.getBoundingClientRect();
+      if (
+        pointerX >= rect.left - hitPad &&
+        pointerX <= rect.right + hitPad &&
+        pointerY >= rect.top - hitPad &&
+        pointerY <= rect.bottom + hitPad
+      ) {
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const dist = (pointerX - cx) ** 2 + (pointerY - cy) ** 2;
+        if (dist < hitDist) {
+          hitDist = dist;
+          hitBadge = badge;
+        }
+      }
+    }
+    return hitBadge;
+  }
+
   gridContainer.addEventListener('click', (event) => {
     if (isDragActive() || wasDragJustCompleted()) return;
+
+    const staircaseBadge = findStaircaseBadgeFromEvent(event);
+    if (staircaseBadge) {
+      event.preventDefault();
+      event.stopPropagation();
+      syncMapTabFromGrid();
+      const letter = staircaseBadge.dataset.staircaseLetter;
+      const isLinked = isStaircaseLinkedToOtherFloor(letter);
+      staircaseBadge.classList.toggle('room__marker--staircase-linked', isLinked);
+      if (isLinked) {
+        handleStaircaseNavigate(letter);
+      }
+      return;
+    }
+
     const cell = event.target.closest('.grid-cell--filled');
     if (!cell || !gridContainer.contains(cell)) return;
     event.stopPropagation();
@@ -469,7 +617,41 @@
     );
   });
 
+  gridContainer.addEventListener('mousemove', (event) => {
+    const staircaseBadge = findStaircaseBadgeFromEvent(event);
+    if (staircaseBadge) {
+      handleStaircaseHover(staircaseBadge.dataset.staircaseLetter);
+      return;
+    }
+    if (hoveredStaircaseLetter) {
+      clearStaircaseLinksOverlay();
+    }
+  });
+
+  gridContainer.addEventListener('mouseleave', () => {
+    clearStaircaseLinksOverlay();
+  });
+
+  window.addEventListener('resize', () => {
+    if (hoveredStaircaseLetter) {
+      updateStaircaseLinksOverlay(hoveredStaircaseLetter);
+    }
+  });
+
   gridContainer.addEventListener('keydown', (event) => {
+    const staircaseBadge = event.target.closest('.room__marker--staircase');
+    if (
+      staircaseBadge &&
+      gridContainer.contains(staircaseBadge) &&
+      (event.key === 'Enter' || event.key === ' ')
+    ) {
+      event.preventDefault();
+      if (staircaseBadge.classList.contains('room__marker--staircase-linked')) {
+        handleStaircaseNavigate(staircaseBadge.dataset.staircaseLetter);
+      }
+      return;
+    }
+
     const cell = event.target.closest('.grid-cell--filled');
     if (!cell || !gridContainer.contains(cell)) return;
     if (event.key === 'Enter' || event.key === ' ') {

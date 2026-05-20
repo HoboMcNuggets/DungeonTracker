@@ -5,6 +5,8 @@ const DEFAULT_GRID_SIZE = 10;
 const DOOR_SIDES = ['n', 'e', 's', 'w'];
 const DOOR_SIDE_ARROWS = { n: '↑', e: '→', s: '↓', w: '←' };
 const DOOR_SIDE_NAMES = { n: 'nord', e: 'est', s: 'sud', w: 'ouest' };
+const OPPOSITE_DOOR_SIDE = { n: 's', s: 'n', e: 'w', w: 'e' };
+const DOOR_NEIGHBOR_OFFSET = { n: { x: 0, y: -1 }, e: { x: 1, y: 0 }, s: { x: 0, y: 1 }, w: { x: -1, y: 0 } };
 const REMOVED_MARKER_IDS = new Set(['key', 'entrance']);
 
 const EMPTY_LOCKED_DOORS = { n: false, e: false, s: false, w: false };
@@ -243,17 +245,50 @@ function toggleMarker(x, y, markerId) {
   return true;
 }
 
+function getDoorNeighborCoords(x, y, side) {
+  const offset = DOOR_NEIGHBOR_OFFSET[side];
+  if (!offset) return null;
+  return { x: x + offset.x, y: y + offset.y };
+}
+
+function syncLinkedDoorLock(sourceX, sourceY, side, locked, updatedCoords) {
+  const neighborCoords = getDoorNeighborCoords(sourceX, sourceY, side);
+  if (!neighborCoords) return;
+
+  const { x: nx, y: ny } = neighborCoords;
+  const neighborCell = getCell(nx, ny);
+  if (!neighborCell) return;
+
+  const oppositeSide = OPPOSITE_DOOR_SIDE[side];
+  const neighborPreset = getPresetById(neighborCell.presetId);
+  if (!neighborPreset?.doors[oppositeSide]) return;
+  if (neighborCell.entranceSide === oppositeSide) return;
+
+  neighborCell.lockedDoors[oppositeSide] = locked;
+  gridState.cells[ny][nx] = neighborCell;
+  updatedCoords.push({ x: nx, y: ny });
+}
+
 function toggleLockedDoor(x, y, side) {
   const cell = getCell(x, y);
-  if (!cell || !DOOR_SIDES.includes(side)) return false;
+  if (!cell || !DOOR_SIDES.includes(side)) {
+    return { locked: false, coords: [] };
+  }
 
   const preset = getPresetById(cell.presetId);
-  if (!preset?.doors[side]) return false;
-  if (cell.entranceSide === side) return false;
+  if (!preset?.doors[side]) {
+    return { locked: false, coords: [] };
+  }
+  if (cell.entranceSide === side) {
+    return { locked: false, coords: [] };
+  }
 
   cell.lockedDoors[side] = !cell.lockedDoors[side];
   gridState.cells[y][x] = cell;
-  return cell.lockedDoors[side];
+
+  const coords = [{ x, y }];
+  syncLinkedDoorLock(x, y, side, cell.lockedDoors[side], coords);
+  return { locked: cell.lockedDoors[side], coords };
 }
 
 function toggleEntranceDoor(x, y, side) {
